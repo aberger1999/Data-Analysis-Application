@@ -17,8 +17,13 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import seaborn as sns
 import jinja2
-from weasyprint import HTML
 import os
+
+try:
+    from weasyprint import HTML
+    WEASYPRINT_AVAILABLE = True
+except (ImportError, OSError):
+    WEASYPRINT_AVAILABLE = False
 
 class ReportGeneratorPanel(QWidget):
     """Panel for generating comprehensive data analysis reports."""
@@ -27,6 +32,7 @@ class ReportGeneratorPanel(QWidget):
         """Initialize the report generator panel."""
         super().__init__()
         self.data_manager = data_manager
+        self.workspace_path = None
         self.template_env = jinja2.Environment(
             loader=jinja2.FileSystemLoader("templates")
         )
@@ -301,37 +307,48 @@ class ReportGeneratorPanel(QWidget):
     def export_pdf(self):
         """Export report as PDF."""
         try:
+            default_dir = ""
+            if self.workspace_path:
+                default_dir = os.path.join(self.workspace_path, "reports", "report.pdf")
+
             file_path, _ = QFileDialog.getSaveFileName(
                 self,
                 "Save PDF Report",
-                "",
+                default_dir,
                 "PDF Files (*.pdf)"
             )
-            
+
             if file_path:
+                if not WEASYPRINT_AVAILABLE:
+                    QMessageBox.warning(
+                        self,
+                        "Feature Not Available",
+                        "PDF export requires WeasyPrint which is not available on this system.\n\n"
+                        "Please use 'Export as HTML' instead, or install WeasyPrint with:\n"
+                        "pip install weasyprint\n\n"
+                        "Note: WeasyPrint requires additional system libraries on Windows."
+                    )
+                    return
+
                 if not file_path.endswith('.pdf'):
                     file_path += '.pdf'
-                    
-                # Get HTML content
+
                 html_content = self.preview_edit.toHtml()
-                
-                # Create a temporary HTML file with proper styling
+
                 temp_html = 'temp_report.html'
                 with open(temp_html, 'w', encoding='utf-8') as f:
                     f.write(html_content)
-                
-                # Convert HTML to PDF using weasyprint
+
                 HTML(temp_html).write_pdf(file_path)
-                
-                # Clean up temporary file
+
                 os.remove(temp_html)
-                
+
                 QMessageBox.information(
                     self,
                     "Success",
                     f"Report exported successfully to {file_path}"
                 )
-                
+
         except Exception as e:
             QMessageBox.critical(
                 self,
@@ -342,30 +359,37 @@ class ReportGeneratorPanel(QWidget):
     def export_html(self):
         """Export report as HTML."""
         try:
+            default_dir = ""
+            if self.workspace_path:
+                default_dir = os.path.join(self.workspace_path, "reports", "report.html")
+
             file_path, _ = QFileDialog.getSaveFileName(
                 self,
                 "Save HTML Report",
-                "",
+                default_dir,
                 "HTML Files (*.html)"
             )
-            
+
             if file_path:
                 if not file_path.endswith('.html'):
                     file_path += '.html'
-                    
-                # Save HTML content
+
                 with open(file_path, 'w', encoding='utf-8') as f:
                     f.write(self.preview_edit.toHtml())
-                    
+
                 QMessageBox.information(
                     self,
                     "Success",
                     f"Report exported successfully to {file_path}"
                 )
-                
+
         except Exception as e:
             QMessageBox.critical(
                 self,
                 "Error",
                 f"Error exporting HTML: {str(e)}"
-            ) 
+            )
+
+    def set_workspace_path(self, workspace_path):
+        """Set the active workspace path."""
+        self.workspace_path = workspace_path 

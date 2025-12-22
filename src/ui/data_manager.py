@@ -21,7 +21,15 @@ class DataManager(QObject):
         self.history = []  # Stack for undo
         self.redo_stack = []  # Stack for redo
         self.max_history = 20  # Maximum number of operations to store
-        
+        self.workspace_path = None
+
+    def clear_data(self):
+        """Clear the current data."""
+        self._data = None
+        self.history = []
+        self.redo_stack = []
+        self.data_loaded.emit(pd.DataFrame())
+
     @property
     def data(self):
         """Get the current dataframe."""
@@ -40,16 +48,37 @@ class DataManager(QObject):
         
         Args:
             file_path (str): Path to the CSV file
-            
+
         Emits:
             data_loaded: When data is successfully loaded
             data_error: If an error occurs during loading
         """
         try:
-            self._data = pd.read_csv(file_path)
+            self._data = pd.read_csv(file_path, low_memory=False)
             self.data_loaded.emit(self._data)
+            self.save_workspace_data()  # Autosave imported data
+
+            if self.workspace_path:
+                import shutil
+                import os
+                data_folder = os.path.join(self.workspace_path, "data")
+                filename = os.path.basename(file_path)
+                dest_path = os.path.join(data_folder, filename)
+                if file_path != dest_path:
+                    shutil.copy2(file_path, dest_path)
         except Exception as e:
             self.data_error.emit(f"Error loading CSV file: {str(e)}")
+
+    def set_workspace_path(self, workspace_path):
+        """Set the active workspace path."""
+        self.workspace_path = workspace_path
+
+    def get_workspace_data_path(self):
+        """Get the data folder path for the active workspace."""
+        if self.workspace_path:
+            import os
+            return os.path.join(self.workspace_path, "data")
+        return None
             
     def get_column_data(self, column_name):
         """
@@ -69,6 +98,69 @@ class DataManager(QObject):
         """
         Calculate basic statistics for a column.
         
+        Args:
+            column_name (str): Name of the column to analyze
+
+        Returns:
+            dict: Dictionary containing basic statistics
+        """
+        if self._data is None or column_name not in self._data.columns:
+            return None
+
+        column_data = self._data[column_name]
+
+        # Basic statistics
+        stats = {
+            'count': len(column_data),
+            'non_null_count': column_data.count(),
+            'null_count': column_data.isnull().sum(),
+            'unique_count': column_data.nunique()
+        }
+
+        # Numeric statistics
+        if pd.api.types.is_numeric_dtype(column_data):
+            stats.update({
+                'mean': column_data.mean(),
+                'median': column_data.median(),
+                'std': column_data.std(),
+                'min': column_data.min(),
+                'max': column_data.max(),
+                'q25': column_data.quantile(0.25),
+                'q75': column_data.quantile(0.75)
+            })
+
+        return stats
+
+    def save_workspace_data(self):
+        """Save current data to the workspace's persistent storage."""
+        if self.workspace_path and self._data is not None:
+            import os
+            try:
+                data_folder = os.path.join(self.workspace_path, "data")
+                os.makedirs(data_folder, exist_ok=True)
+                path = os.path.join(data_folder, "workspace_data.csv")
+                self._data.to_csv(path, index=False)
+            except Exception as e:
+                print(f"Failed to autosave workspace data: {e}")
+
+    def load_workspace_data(self):
+        """Load data from the workspace's persistent storage if it exists."""
+        if self.workspace_path:
+            import os
+            path = os.path.join(self.workspace_path, "data", "workspace_data.csv")
+            if os.path.exists(path):
+                try:
+                    self._data = pd.read_csv(path, low_memory=False)
+                    self.data_loaded.emit(self._data)
+                    return True
+                except Exception as e:
+                    self.data_error.emit(f"Error loading workspace data: {str(e)}")
+        return False
+
+    def get_basic_stats(self, column_name):
+        """
+        Calculate basic statistics for a column.
+
         Args:
             column_name (str): Name of the column to analyze
             

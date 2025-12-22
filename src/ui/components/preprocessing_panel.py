@@ -265,61 +265,104 @@ class PreprocessingPanel(QWidget):
         # Add Apply Changes button
         self.apply_changes_btn = QPushButton("Apply Changes to Main View")
         self.apply_changes_btn.setEnabled(False)  # Disable initially until data is loaded
-        self.apply_changes_btn.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold;")
         pagination.addWidget(self.apply_changes_btn)
-        
+
         transform_layout.addWidget(self.data_view)
         transform_layout.addLayout(pagination)
-        
-        # Create Preprocessing tab
-        preprocess_tab = QWidget()
-        preprocess_layout = QVBoxLayout(preprocess_tab)
-        
+
+        # Create Cleaning tab (formerly Preprocessing)
+        cleaning_tab = QWidget()
+        cleaning_layout = QVBoxLayout(cleaning_tab)
+
+        # --- Missing Values Group ---
+        missing_group = QGroupBox("Missing Values")
+        missing_layout = QHBoxLayout(missing_group)
+
+        self.missing_col_combo = QComboBox()
+        self.missing_col_combo.addItem("All Columns")
+
+        self.missing_action_combo = QComboBox()
+        self.missing_action_combo.addItems([
+            "Drop Rows",
+            "Fill with Mean",
+            "Fill with Median",
+            "Fill with Mode",
+            "Fill with 0",
+            "Forward Fill",
+            "Backward Fill"
+        ])
+
+        self.apply_missing_btn = QPushButton("Apply")
+
+        missing_layout.addWidget(QLabel("Column:"))
+        missing_layout.addWidget(self.missing_col_combo)
+        missing_layout.addWidget(QLabel("Action:"))
+        missing_layout.addWidget(self.missing_action_combo)
+        missing_layout.addWidget(self.apply_missing_btn)
+
+        cleaning_layout.addWidget(missing_group)
+
+        # --- Duplicates Group ---
+        duplicates_group = QGroupBox("Duplicates")
+        duplicates_layout = QHBoxLayout(duplicates_group)
+
+        self.duplicates_action_combo = QComboBox()
+        self.duplicates_action_combo.addItems(["Remove Duplicates", "Keep First", "Keep Last"])
+
+        self.apply_duplicates_btn = QPushButton("Apply")
+
+        duplicates_layout.addWidget(QLabel("Action:"))
+        duplicates_layout.addWidget(self.duplicates_action_combo)
+        duplicates_layout.addWidget(self.apply_duplicates_btn)
+        duplicates_layout.addStretch()
+
+        cleaning_layout.addWidget(duplicates_group)
+
         # Outlier Detection Group
         outlier_group = QGroupBox("Outlier Detection")
         outlier_layout = QGridLayout(outlier_group)
-        
+
         # Column selection
         outlier_layout.addWidget(QLabel("Column:"), 0, 0)
         self.outlier_column_combo = QComboBox()
         outlier_layout.addWidget(self.outlier_column_combo, 0, 1)
-        
+
         # Method selection
         outlier_layout.addWidget(QLabel("Method:"), 1, 0)
         self.outlier_method_combo = QComboBox()
         self.outlier_method_combo.addItems(["IQR Method", "Z-Score Method", "Modified Z-Score"])
         outlier_layout.addWidget(self.outlier_method_combo, 1, 1)
-        
+
         # Threshold
         outlier_layout.addWidget(QLabel("Threshold:"), 2, 0)
         self.threshold_spin = QSpinBox()
         self.threshold_spin.setRange(1, 10)
         self.threshold_spin.setValue(3)
         outlier_layout.addWidget(self.threshold_spin, 2, 1)
-        
+
         # Detect button
         self.detect_outliers_btn = QPushButton("Detect Outliers")
         outlier_layout.addWidget(self.detect_outliers_btn, 3, 0, 1, 2)
-        
-        preprocess_layout.addWidget(outlier_group)
-        
+
+        cleaning_layout.addWidget(outlier_group)
+
         # Outlier View Group
         view_group = QGroupBox("Outlier View")
         view_layout = QVBoxLayout(view_group)
-        
+
         # Controls
         controls_layout = QHBoxLayout()
         self.show_only_outliers = QCheckBox("Show Only Outliers")
         controls_layout.addWidget(self.show_only_outliers)
-        
+
         self.sort_combo = QComboBox()
         self.sort_combo.addItems(["Value", "Outlier Status"])
         controls_layout.addWidget(QLabel("Sort by:"))
         controls_layout.addWidget(self.sort_combo)
         controls_layout.addStretch()
-        
+
         view_layout.addLayout(controls_layout)
-        
+
         # Outlier table
         self.outlier_table = QTableWidget()
         self.outlier_table.setColumnCount(2)
@@ -327,13 +370,13 @@ class PreprocessingPanel(QWidget):
         # Make outlier table cells not editable
         self.outlier_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         view_layout.addWidget(self.outlier_table)
-        
-        preprocess_layout.addWidget(view_group)
-        
+
+        cleaning_layout.addWidget(view_group)
+
         # Outlier Handling Group
         handling_group = QGroupBox("Outlier Handling")
         handling_layout = QHBoxLayout(handling_group)
-        
+
         self.handling_method_combo = QComboBox()
         self.handling_method_combo.addItems([
             "Remove outliers",
@@ -342,15 +385,15 @@ class PreprocessingPanel(QWidget):
             "Replace with median"
         ])
         handling_layout.addWidget(self.handling_method_combo)
-        
+
         self.apply_handling_btn = QPushButton("Apply")
         handling_layout.addWidget(self.apply_handling_btn)
-        
-        preprocess_layout.addWidget(handling_group)
-        
+
+        cleaning_layout.addWidget(handling_group)
+
         # Add tabs
         self.tabs.addTab(transform_tab, "Transform")
-        self.tabs.addTab(preprocess_tab, "Preprocessing")
+        self.tabs.addTab(cleaning_tab, "Cleaning")
         
         layout.addWidget(self.tabs)
         
@@ -405,6 +448,10 @@ class PreprocessingPanel(QWidget):
         self.show_only_outliers.stateChanged.connect(self.update_outlier_view)
         self.sort_combo.currentTextChanged.connect(self.update_outlier_view)
         self.apply_handling_btn.clicked.connect(self.apply_outlier_handling)
+
+        # Missing values and duplicates
+        self.apply_missing_btn.clicked.connect(self.handle_missing_values)
+        self.apply_duplicates_btn.clicked.connect(self.handle_duplicates)
         
         # Update data when loaded
         self.data_manager.data_loaded.connect(self.on_data_loaded)
@@ -925,9 +972,31 @@ class PreprocessingPanel(QWidget):
 
     def on_data_loaded(self, df):
         """Handle when new data is loaded."""
+        if df is None or df.empty:
+            self.data_loaded_flag = False
+            self.filter_column.clear()
+            self.filter_column.setEnabled(False)
+            self.filter_condition.setEnabled(False)
+            self.filter_value.setEnabled(False)
+            self.rounding_column.clear()
+            self.rounding_column.setEnabled(False)
+            self.rounding_digits.setEnabled(False)
+            self.apply_rounding_btn.setEnabled(False)
+            self.split_column.clear()
+            self.split_column.setEnabled(False)
+            self.split_delimiter.setEnabled(False)
+            self.apply_split_btn.setEnabled(False)
+            self.unpivot_id_column.clear()
+            self.unpivot_id_column.clear()
+            self.unpivot_id_column.setEnabled(False)
+            self.data_view.clear()
+            self.data_view.setRowCount(0)
+            self.data_view.setColumnCount(0)
+            return
+
         # Set the data loaded flag
         self.data_loaded_flag = True
-        
+
         # Update column selectors
         self.filter_column.clear()
         self.filter_column.addItems(df.columns)
@@ -963,6 +1032,11 @@ class PreprocessingPanel(QWidget):
         self.outlier_column_combo.clear()
         numeric_columns = df.select_dtypes(include=[np.number]).columns
         self.outlier_column_combo.addItems(numeric_columns)
+
+        # New Cleaning features
+        self.missing_col_combo.clear()
+        self.missing_col_combo.addItem("All Columns")
+        self.missing_col_combo.addItems(df.columns)
         
         # Update data type combo - temporarily disconnect signal to prevent triggering handle_type_change
         self.dtype_combo.blockSignals(True)
@@ -1420,13 +1494,10 @@ class PreprocessingPanel(QWidget):
                 df = df[~outlier_mask]
             else:
                 if method == "Cap outliers":
-                    if detection_method == "IQR Method":
-                        data[outlier_mask] = data[outlier_mask].clip(lower_bound, upper_bound)
-                    else:
-                        # For other methods, use percentiles for capping
-                        lower_bound = np.percentile(data[~outlier_mask], 1)
-                        upper_bound = np.percentile(data[~outlier_mask], 99)
-                        data[outlier_mask] = data[outlier_mask].clip(lower_bound, upper_bound)
+                    # For capping, use percentiles
+                    lower_bound = np.percentile(data[~outlier_mask], 1)
+                    upper_bound = np.percentile(data[~outlier_mask], 99)
+                    data[outlier_mask] = data[outlier_mask].clip(lower_bound, upper_bound)
                 elif method == "Replace with mean":
                     replacement = data[~outlier_mask].mean()
                     data[outlier_mask] = replacement
@@ -1521,10 +1592,15 @@ class PreprocessingPanel(QWidget):
             self.data_manager.data_loaded.emit(df)
             
             progress.setValue(100)
-            
+
+            # Update the data manager with the new dataframe
+            self.data_manager._data = df
+            self.data_manager.save_workspace_data() # Autosave changes
+
+            # Update only the local view without emitting data_loaded signal
             # Show success message
             QMessageBox.information(self, "Success", "Changes applied to main view successfully!")
-            
+
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error applying changes: {str(e)}")
         finally:
@@ -1564,8 +1640,9 @@ class PreprocessingPanel(QWidget):
             
             # Update only the local view without emitting data_loaded signal
             self.update_data_view()
-            
-            QMessageBox.information(self, "Success", 
+            self.data_manager.save_workspace_data()  # Autosave changes
+
+            QMessageBox.information(self, "Success",
                                   f"Column '{column}' rounded to {digits} decimal places successfully! "
                                   f"Click 'Apply Changes to Main View' to update the main data preview.")
             
@@ -1774,9 +1851,84 @@ class PreprocessingPanel(QWidget):
             QMessageBox.information(self, "Success", 
                                   f"Data grouped by '{column}' with '{aggregation}' aggregation successfully! "
                                   f"Click 'Apply Changes to Main View' to update the main data preview.")
-            
+
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error grouping data: {str(e)}")
         finally:
             if 'progress' in locals():
-                progress.close() 
+                progress.close()
+
+    def handle_missing_values(self):
+        """Handle missing values."""
+        if self.data_manager.data is None:
+            return
+
+        column = self.missing_col_combo.currentText()
+        action = self.missing_action_combo.currentText()
+
+        try:
+            self.save_state()
+            df = self.data_manager.data
+
+            if column == "All Columns":
+                cols = df.columns
+            else:
+                cols = [column]
+
+            for col in cols:
+                if action == "Drop Rows":
+                    df.dropna(subset=[col], inplace=True)
+                elif action == "Fill with Mean":
+                    if pd.api.types.is_numeric_dtype(df[col]):
+                        df[col].fillna(df[col].mean(), inplace=True)
+                elif action == "Fill with Median":
+                    if pd.api.types.is_numeric_dtype(df[col]):
+                        df[col].fillna(df[col].median(), inplace=True)
+                elif action == "Fill with Mode":
+                    if not df[col].mode().empty:
+                        df[col].fillna(df[col].mode()[0], inplace=True)
+                elif action == "Fill with 0":
+                    if pd.api.types.is_numeric_dtype(df[col]):
+                        df[col].fillna(0, inplace=True)
+                elif action == "Forward Fill":
+                    df[col].fillna(method='ffill', inplace=True)
+                elif action == "Backward Fill":
+                    df[col].fillna(method='bfill', inplace=True)
+
+            self.update_data_view()
+            self.preprocessing_complete.emit()
+            QMessageBox.information(self, "Success", f"Missing values handled using '{action}'.")
+
+        except Exception as e:
+            self.undo()
+            QMessageBox.critical(self, "Error", f"Error handling missing values: {str(e)}")
+
+    def handle_duplicates(self):
+        """Handle duplicates."""
+        if self.data_manager.data is None:
+            return
+
+        action = self.duplicates_action_combo.currentText()
+
+        try:
+            self.save_state()
+            df = self.data_manager.data
+            initial_count = len(df)
+
+            if action == "Remove Duplicates":
+                df.drop_duplicates(inplace=True)
+            elif action == "Keep First":
+                df.drop_duplicates(keep='first', inplace=True)
+            elif action == "Keep Last":
+                df.drop_duplicates(keep='last', inplace=True)
+
+            final_count = len(df)
+            removed = initial_count - final_count
+
+            self.update_data_view()
+            self.preprocessing_complete.emit()
+            QMessageBox.information(self, "Success", f"Removed {removed} duplicate rows.")
+
+        except Exception as e:
+            self.undo()
+            QMessageBox.critical(self, "Error", f"Error handling duplicates: {str(e)}") 

@@ -31,20 +31,21 @@ class VisualizationPanel(QWidget):
         """Initialize the visualization panel."""
         super().__init__()
         self.data_manager = data_manager
-        
+        self.workspace_path = None
+
         # Set up matplotlib figure
         plt.style.use('seaborn-v0_8')  # Use a more specific style name
         self.figure = Figure(figsize=(10, 8), dpi=100)  # Increased figure size
         self.canvas = FigureCanvas(self.figure)
-        
+
         # Set up navigation toolbar
         self.toolbar = NavigationToolbar(self.canvas, self)
-        
+
         # Store selected colors for series
         self.series_colors = {}
         self.custom_color = None
         self.color_map = None
-        
+
         # Store selected series for multi-series plots
         self.selected_series = []
         
@@ -110,15 +111,22 @@ class VisualizationPanel(QWidget):
         self.color_by_combo.setEnabled(False)
         data_layout.addWidget(color_by_label, 3, 0)
         data_layout.addWidget(self.color_by_combo, 3, 1)
+
+        # Aggregation method for bar charts
+        agg_label = QLabel("Aggregation:")
+        self.agg_combo = QComboBox()
+        self.agg_combo.addItems(["Mean", "Sum", "Count", "Median", "Min", "Max"])
+        self.agg_combo.setEnabled(False)
+        data_layout.addWidget(agg_label, 4, 0)
+        data_layout.addWidget(self.agg_combo, 4, 1)
         
-        # Multiple series selection
-        series_label = QLabel("Data Series:")
+        # Series selection for multi-series plots
+        series_label = QLabel("Series (Multi-select):")
         self.series_list = QListWidget()
-        self.series_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
-        self.series_list.setMaximumHeight(100)
-        self.series_list.setEnabled(False)
-        data_layout.addWidget(series_label, 4, 0)
-        data_layout.addWidget(self.series_list, 4, 1)
+        self.series_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
+        self.series_list.setMaximumHeight(100)  # Limit height to save space
+        data_layout.addWidget(series_label, 5, 0)
+        data_layout.addWidget(self.series_list, 5, 1)
         
         controls_tabs.addTab(data_tab, "Data Selection")
         
@@ -296,14 +304,35 @@ class VisualizationPanel(QWidget):
         is_pie_chart = chart_type == "Pie Chart"
         is_histogram = chart_type == "Histogram"
         is_scatter_plot = chart_type == "Scatter Plot"
+        is_heatmap = chart_type == "Heatmap"
         
-        # Pie charts only need one variable (Y-axis)
-        self.x_axis_combo.setEnabled(not is_pie_chart)
+        # X-Axis visibility/enabled
+        # Pie charts use X-axis as "Labels", others as domain
+        self.x_axis_combo.setEnabled(True)
         
-        # Enable color by option only for scatter plots
-        self.color_by_combo.setEnabled(is_scatter_plot)
+        # Y-Axis Combo vs Series List
+        # Scatter plots need specific X and Y coordinates
+        if is_scatter_plot:
+            self.y_axis_combo.setEnabled(True)
+            self.y_axis_combo.setVisible(True)
+            self.series_list.setEnabled(False)
+            self.series_list.setVisible(False)
+            self.color_by_combo.setEnabled(True)
+        else:
+            # Most charts use the Series List for values
+            self.y_axis_combo.setEnabled(False)
+            self.y_axis_combo.setVisible(False)
+            self.series_list.setEnabled(True)
+            self.series_list.setVisible(True)
+            self.color_by_combo.setEnabled(False)
+
+        # Aggregation is useful for Bar Charts primarily
+        self.agg_combo.setEnabled(chart_type == "Bar Chart")
         
-        # Update controls and schedule visualization update
+        # Update layout to handle visibility changes
+        self.layout().invalidate()
+        
+        # Schedule update
         self.schedule_update()
         
     def on_color_theme_changed(self, theme):
@@ -325,6 +354,16 @@ class VisualizationPanel(QWidget):
         
     def on_data_loaded(self, df):
         """Handle when new data is loaded."""
+        if df is None or df.empty:
+            self.x_axis_combo.clear()
+            self.y_axis_combo.clear()
+            self.color_by_combo.clear()
+            self.series_list.clear()
+            self.x_axis_combo.setEnabled(False)
+            self.y_axis_combo.setEnabled(False)
+            self.color_by_combo.setEnabled(False)
+            return
+
         # Get all columns
         all_columns = df.columns.tolist()
         numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
@@ -374,26 +413,33 @@ class VisualizationPanel(QWidget):
         """Export the plot to a file."""
         if self.data_manager.data is None:
             return
-            
-        # Get default filename based on chart title
-        chart_title = self.title_edit.text() or "chart"  # Changed from currentText() to text()
+
+        chart_title = self.title_edit.text() or "chart"
         filename = f"{chart_title.replace(' ', '_')}.{format_type}"
-        
-        # Open file dialog
+
+        default_dir = ""
+        if self.workspace_path:
+            default_dir = os.path.join(self.workspace_path, "graphs", filename)
+        else:
+            default_dir = filename
+
         file_path, _ = QFileDialog.getSaveFileName(
-            self, 
-            f"Save {format_type.upper()} File", 
-            filename,
+            self,
+            f"Save {format_type.upper()} File",
+            default_dir,
             f"{format_type.upper()} Files (*.{format_type})"
         )
-        
+
         if file_path:
-            # Save the figure
             try:
                 self.figure.savefig(file_path, format=format_type, dpi=300, bbox_inches='tight')
                 print(f"Plot saved to {file_path}")
             except Exception as e:
                 print(f"Error saving plot: {str(e)}")
+
+    def set_workspace_path(self, workspace_path):
+        """Set the active workspace path."""
+        self.workspace_path = workspace_path
                 
     def update_visualization(self):
         """Update the visualization with current settings."""
@@ -418,12 +464,33 @@ class VisualizationPanel(QWidget):
             color_by = None
             
         # Get selected series for multi-series plots
-        selected_series = self.selected_series if self.selected_series else ([y_col] if y_col else [])
+        # For scatter plots, we don't use the series list
+        if self.chart_combo.currentText() == "Scatter Plot":
+            selected_series = []
+        else:
+            selected_series = self.selected_series
+            # If nothing selected in list, but we have data, maybe auto-select first numeric?
+            if not selected_series and not df.empty:
+                # Optional: Auto-select behavior could go here, but for now let's respect the empty selection
+                pass
         
-        # Skip if no data to plot
-        if (not x_col and not y_col) or not selected_series:
-            self.canvas.draw()
+        # Skip if insufficient data to plot
+        chart_type = self.chart_combo.currentText()
+        if chart_type == "Scatter Plot":
+            if not x_col or not y_col:
+                self.placeholder.setText("Please select X and Y axes")
+                self.placeholder.setVisible(True)
+                self.canvas.setVisible(False)
+                return
+        elif not selected_series and chart_type != "Heatmap": 
+            # Heatmap can work with just whole dataframe correlation if implied
+            self.placeholder.setText("Please select at least one data series")
+            self.placeholder.setVisible(True)
+            self.canvas.setVisible(False)
             return
+
+        self.placeholder.setVisible(False)
+        self.canvas.setVisible(True)
             
         # Get alpha (transparency) value
         alpha = self.alpha_slider.value() / 100.0
@@ -433,84 +500,101 @@ class VisualizationPanel(QWidget):
         
         # Create subplot
         ax = self.figure.add_subplot(111)
+        ax.set_axisbelow(True)  # Put grid behind plot elements
         
         try:
-            chart_type = self.chart_combo.currentText()
-            
             if chart_type == "Line Chart":
                 if not x_col:
                     # Use index if x is None
                     for i, series in enumerate(selected_series):
                         if self.color_combo.currentText() == "Custom" and self.custom_color:
-                            ax.plot(df.index, df[series], marker='o', alpha=alpha, 
+                            ax.plot(df.index, df[series], marker='o', alpha=alpha,
                                     label=series, color=self.custom_color)
                         else:
                             ax.plot(df.index, df[series], marker='o', alpha=alpha, label=series)
                 else:
+                    # Sort data by x-axis to ensure proper line connections
+                    # Check if x_col is numeric to sort properly, otherwise rely on index order
+                    if pd.api.types.is_numeric_dtype(df[x_col]) or pd.api.types.is_datetime64_any_dtype(df[x_col]):
+                        sorted_df = df.sort_values(by=x_col)
+                        x_data = sorted_df[x_col]
+                        plot_df = sorted_df
+                    else:
+                        x_data = df[x_col]
+                        plot_df = df
+                        
                     for i, series in enumerate(selected_series):
                         if self.color_combo.currentText() == "Custom" and self.custom_color:
-                            ax.plot(df[x_col], df[series], marker='o', alpha=alpha, 
+                            ax.plot(x_data, plot_df[series], marker='o', alpha=alpha,
                                     label=series, color=self.custom_color)
                         else:
-                            ax.plot(df[x_col], df[series], marker='o', alpha=alpha, label=series)
-                        
+                            ax.plot(x_data, plot_df[series], marker='o', alpha=alpha, label=series)
+                
+                # Rotate x-labels if they are likely to overlap (many categories)
+                if x_col and not pd.api.types.is_numeric_dtype(df[x_col]):
+                    plt.xticks(rotation=45, ha='right')
+
             elif chart_type == "Bar Chart":
                 # Handle multiple series for bar chart
                 if not x_col:
                     # Use index if x is None
                     index = np.arange(len(df))
-                    if len(selected_series) == 1:
-                        if self.color_combo.currentText() == "Custom" and self.custom_color:
-                            ax.bar(index, df[selected_series[0]], alpha=alpha, 
-                                   label=selected_series[0], color=self.custom_color)
-                        else:
-                            ax.bar(index, df[selected_series[0]], alpha=alpha, label=selected_series[0])
-                        ax.set_xticks(index)
-                        ax.set_xticklabels(df.index)
-                    else:
-                        # Create grouped bar chart for multiple series
-                        width = 0.8 / len(selected_series)
-                        for i, series in enumerate(selected_series):
-                            offset = i - len(selected_series)/2 + 0.5
-                            ax.bar(index + offset*width, df[series], width, alpha=alpha, label=series)
-                        ax.set_xticks(index)
-                        ax.set_xticklabels(df.index)
-                else:
-                    if len(selected_series) == 1:
-                        if self.color_combo.currentText() == "Custom" and self.custom_color:
-                            ax.bar(df[x_col], df[selected_series[0]], alpha=alpha, 
-                                   label=selected_series[0], color=self.custom_color)
-                        else:
-                            ax.bar(df[x_col], df[selected_series[0]], alpha=alpha, label=selected_series[0])
-                    else:
-                        # Create grouped bar chart for multiple series
-                        x = np.arange(len(df[x_col]))
-                        width = 0.8 / len(selected_series)
-                        
-                        for i, series in enumerate(selected_series):
-                            offset = i - len(selected_series)/2 + 0.5
-                            ax.bar(x + offset*width, df[series], width, alpha=alpha, label=series)
-                        
-                        ax.set_xticks(x)
-                        ax.set_xticklabels(df[x_col])
+                    width = 0.8 / len(selected_series)
                     
+                    for i, series in enumerate(selected_series):
+                        offset = i - len(selected_series)/2 + 0.5
+                        if self.color_combo.currentText() == "Custom" and self.custom_color:
+                            ax.bar(index + offset*width, df[series], width, alpha=alpha,
+                                   label=series, color=self.custom_color)
+                        else:
+                            ax.bar(index + offset*width, df[series], width, alpha=alpha, label=series)
+                            
+                    ax.set_xticks(index)
+                    # Limit labels if too many
+                    if len(df) > 20:
+                         step = len(df) // 20
+                         ax.set_xticks(index[::step])
+                         ax.set_xticklabels(df.index[::step], rotation=45, ha='right')
+                    else:
+                        ax.set_xticklabels(df.index, rotation=45, ha='right')
+                else:
+                    x = np.arange(len(df))
+                    width = 0.8 / len(selected_series)
+
+                    for i, series in enumerate(selected_series):
+                        offset = i - len(selected_series)/2 + 0.5
+                        if self.color_combo.currentText() == "Custom" and self.custom_color:
+                             ax.bar(x + offset*width, df[series], width, alpha=alpha,
+                                    label=series, color=self.custom_color)
+                        else:
+                            ax.bar(x + offset*width, df[series], width, alpha=alpha, label=series)
+
+                    ax.set_xticks(x)
+                    # Handle many categories
+                    if len(df) > 20:
+                        step = len(df) // 20
+                        ax.set_xticks(x[::step])
+                        ax.set_xticklabels(df[x_col].iloc[::step], rotation=45, ha='right')
+                    else:
+                        ax.set_xticklabels(df[x_col], rotation=45, ha='right')
+
             elif chart_type == "Scatter Plot":
                 marker_size = self.marker_size.value()
-                
+
                 if not x_col or not y_col:
                     # Skip if missing an axis for scatter plot
                     pass
                 elif color_by:
                     # Use the color_by column for point colors
                     scatter = ax.scatter(
-                        df[x_col], 
-                        df[y_col], 
+                        df[x_col],
+                        df[y_col],
                         c=df[color_by] if pd.api.types.is_numeric_dtype(df[color_by]) else None,
-                        alpha=alpha, 
+                        alpha=alpha,
                         s=marker_size*10,
                         cmap=self.color_map or 'viridis'
                     )
-                    
+
                     # Add colorbar if using numeric column for colors
                     if pd.api.types.is_numeric_dtype(df[color_by]):
                         cbar = plt.colorbar(scatter, ax=ax)
@@ -521,48 +605,67 @@ class VisualizationPanel(QWidget):
                         for category in categories:
                             mask = df[color_by] == category
                             ax.scatter(
-                                df[x_col][mask], 
-                                df[y_col][mask], 
-                                alpha=alpha, 
+                                df[x_col][mask],
+                                df[y_col][mask],
+                                alpha=alpha,
                                 s=marker_size*10,
                                 label=category
                             )
                 else:
                     # Regular scatter plot without color mapping
                     if self.color_combo.currentText() == "Custom" and self.custom_color:
-                        ax.scatter(df[x_col], df[y_col], alpha=alpha, s=marker_size*10, 
+                        ax.scatter(df[x_col], df[y_col], alpha=alpha, s=marker_size*10,
                                   color=self.custom_color)
                     else:
                         ax.scatter(df[x_col], df[y_col], alpha=alpha, s=marker_size*10)
-                        
+
             elif chart_type == "Histogram":
                 bins = self.bins_spinbox.value()
                 for series in selected_series:
                     if self.color_combo.currentText() == "Custom" and self.custom_color:
-                        ax.hist(df[series], bins=bins, alpha=alpha, density=True, 
+                        ax.hist(df[series], bins=bins, alpha=alpha, density=True,
                                label=series, color=self.custom_color)
                     else:
                         ax.hist(df[series], bins=bins, alpha=alpha, density=True, label=series)
-                        
+
                     if len(df[series].dropna()) > 1:  # Only add KDE if we have enough data points
                         density = stats.gaussian_kde(df[series].dropna())
                         xs = np.linspace(df[series].min(), df[series].max(), 200)
                         ax.plot(xs, density(xs), label=f'{series} KDE')
                 ax.set_ylabel('Density')
-                
+
             elif chart_type == "Box Plot":
                 data = []
                 labels = []
                 for series in selected_series:
-                    data.append(df[series].dropna())
-                    labels.append(series)
-                    
-                if self.color_combo.currentText() == "Custom" and self.custom_color:
-                    ax.boxplot(data, labels=labels, patch_artist=True, 
-                              boxprops=dict(alpha=alpha, color=self.custom_color))
-                else:
-                    ax.boxplot(data, labels=labels, patch_artist=True, 
-                              boxprops=dict(alpha=alpha))
+                    series_data = df[series].dropna()
+                    if len(series_data) > 0:
+                        data.append(series_data.values)
+                        labels.append(series)
+
+                if data:
+                    bp = ax.boxplot(data, labels=labels, patch_artist=True)
+
+                    if self.color_combo.currentText() == "Custom" and self.custom_color:
+                        for box in bp['boxes']:
+                            box.set_facecolor(self.custom_color)
+                            box.set_alpha(alpha)
+                        for whisker in bp['whiskers']:
+                            whisker.set_color(self.custom_color)
+                        for cap in bp['caps']:
+                            cap.set_color(self.custom_color)
+                        for median in bp['medians']:
+                            median.set_color('black')
+                        for flier in bp['fliers']:
+                            flier.set_markerfacecolor(self.custom_color)
+                            flier.set_alpha(alpha)
+                    else:
+                        colors = plt.cm.Set2(np.linspace(0, 1, len(data)))
+                        for i, box in enumerate(bp['boxes']):
+                            box.set_facecolor(colors[i])
+                            box.set_alpha(alpha)
+                        for median in bp['medians']:
+                            median.set_color('black')
                 
             elif chart_type == "Violin Plot":
                 # For violin plots, use seaborn to handle the data

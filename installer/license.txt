@@ -1,0 +1,22 @@
+END USER LICENSE AGREEMENT
+
+This End User License Agreement ("Agreement") is between you and [Your Company Name].
+
+PLEASE READ THIS AGREEMENT CAREFULLY BEFORE USING THIS SOFTWARE.
+
+1. LICENSE GRANT
+[Your Company Name] grants you a non-exclusive, non-transferable license to use the Data Analysis Application software.
+
+2. RESTRICTIONS
+You may not reverse engineer, decompile, or disassemble the software.
+
+3. TERMINATION
+This license is effective until terminated. Your rights under this license will terminate automatically without notice if you fail to comply with any term of this Agreement.
+
+4. DISCLAIMER OF WARRANTY
+THE SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND.
+
+5. LIMITATION OF LIABILITY
+IN NO EVENT SHALL [YOUR COMPANY NAME] BE LIABLE FOR ANY DAMAGES WHATSOEVER.
+
+By installing this software, you acknowledge that you have read this agreement, understand it, and agree to be bound by its terms and conditions.

@@ -10,3 +10,7 @@ xlrd>=2.0.1
 jinja2>=3.1.0
 pyinstaller>=6.0.0
 pillow>=10.0.0
+
+# Optional: For MSI installer creation (alternative to WiX)
+# Uncomment the line below if you want to use cx_Freeze for MSI generation
+# cx_Freeze>=6.15.0

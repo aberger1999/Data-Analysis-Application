@@ -60,11 +60,12 @@ cover/
 # data_analysis_app.spec # Keeping this as it is customized source
 # dist/ and build/ are already covered above
 
-# Distribution
+# Distribution / Installers
 release/
 *.zip
 *.exe
 *.dmg
+*.msi
 
 # Microsoft Windows
 Thumbs.db
@@ -88,3 +89,14 @@ temp_*.png
 temp_*.html
 *.pdf
 # Be careful with *.pdf if you have documentation pdfs, but usually generated reports
+
+# MSI/Installer Build Artifacts
+installer/build/
+installer/*.wixobj
+installer/*.wixpdb
+installer/files.wxs
+installer/*.exe
+installer/*.msi
+
+# cx_Freeze build artifacts
+build_msi/

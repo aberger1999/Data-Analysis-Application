@@ -6,7 +6,7 @@ Simplified configuration that uses src/main.py directly as entry point.
 
 import sys
 import os
-from PyInstaller.utils.hooks import collect_data_files, collect_all
+from PyInstaller.utils.hooks import collect_data_files, collect_all, collect_submodules
 
 block_cipher = None
 
@@ -139,18 +139,17 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='DataAnalysisApp',
+    name='data_analysis_app',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,  # Keep console to see errors - change to False for release
+    console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='assets/icon.ico',
 )
 
 # ============================================================================
@@ -165,5 +164,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='DataAnalysisApp',
+    name='data_analysis_app',
 )

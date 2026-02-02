@@ -17,8 +17,9 @@ from datetime import datetime
 
 class FeatureEngineeringPanel(QWidget):
     """Panel for feature engineering operations."""
-    
+
     feature_created = pyqtSignal()  # Signal when new feature is created
+    data_modified = pyqtSignal()  # Signal when data is modified
     
     def __init__(self, data_manager):
         """Initialize the feature engineering panel."""
@@ -346,8 +347,9 @@ class FeatureEngineeringPanel(QWidget):
                     
             self.data_manager._data = df
             self.data_manager.data_loaded.emit(df)
+            self.data_modified.emit()
             QMessageBox.information(self, "Success", "New feature created successfully!")
-            
+
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error creating feature: {str(e)}")
             
@@ -355,47 +357,48 @@ class FeatureEngineeringPanel(QWidget):
         """Apply the selected encoding method to categorical features."""
         if self.data_manager.data is None:
             return
-            
+
         df = self.data_manager.data.copy()
         col = self.cat_col_combo.currentText()
         method = self.encoding_combo.currentText()
-        
+
         try:
             if method == "Label Encoding":
                 if col not in self.label_encoders:
                     self.label_encoders[col] = LabelEncoder()
                 df[f"{col}_encoded"] = self.label_encoders[col].fit_transform(df[col])
-                
+
             elif method == "One-Hot Encoding":
                 encoded = pd.get_dummies(df[col], prefix=col)
                 df = pd.concat([df, encoded], axis=1)
-                
+
             elif method == "Binary Encoding":
                 # Create binary encoding manually
                 unique_values = df[col].unique()
                 n_values = len(unique_values)
                 n_bits = int(np.ceil(np.log2(n_values)))
-                
-                value_to_binary = {val: format(i, f'0{n_bits}b') 
+
+                value_to_binary = {val: format(i, f'0{n_bits}b')
                                  for i, val in enumerate(unique_values)}
-                
+
                 for bit in range(n_bits):
                     df[f"{col}_bin_{bit}"] = df[col].map(
                         lambda x: int(value_to_binary[x][bit]))
-                    
+
             elif method == "Frequency Encoding":
                 frequency = df[col].value_counts(normalize=True)
                 df[f"{col}_freq"] = df[col].map(frequency)
-                
+
             elif method == "Target Encoding":
                 target_col = self.target_col_combo.currentText()
                 target_mean = df.groupby(col)[target_col].mean()
                 df[f"{col}_target_encoded"] = df[col].map(target_mean)
-                
+
             self.data_manager._data = df
             self.data_manager.data_loaded.emit(df)
+            self.data_modified.emit()
             QMessageBox.information(self, "Success", "Categorical encoding applied successfully!")
-            
+
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error applying encoding: {str(e)}")
             
@@ -403,10 +406,10 @@ class FeatureEngineeringPanel(QWidget):
         """Extract selected features from datetime column."""
         if self.data_manager.data is None:
             return
-            
+
         df = self.data_manager.data.copy()
         col = self.dt_col_combo.currentText()
-        
+
         try:
             if self.year_check.isChecked():
                 df[f"{col}_year"] = pd.to_datetime(df[col]).dt.year
@@ -424,11 +427,12 @@ class FeatureEngineeringPanel(QWidget):
                 df[f"{col}_quarter"] = pd.to_datetime(df[col]).dt.quarter
             if self.is_weekend_check.isChecked():
                 df[f"{col}_is_weekend"] = pd.to_datetime(df[col]).dt.dayofweek.isin([5, 6])
-                
+
             self.data_manager._data = df
             self.data_manager.data_loaded.emit(df)
+            self.data_modified.emit()
             QMessageBox.information(self, "Success", "DateTime features extracted successfully!")
-            
+
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error extracting datetime features: {str(e)}")
             
@@ -491,6 +495,7 @@ class FeatureEngineeringPanel(QWidget):
                 
             self.data_manager._data = df
             self.data_manager.data_loaded.emit(df)
+            self.data_modified.emit()
             QMessageBox.information(self, "Success", "Combined feature created successfully!")
             
         except Exception as e:

@@ -19,10 +19,12 @@ from copy import deepcopy
 
 class PreprocessingPanel(QWidget):
     """Panel for data preprocessing operations."""
-    
+
     # Signal to notify when preprocessing is complete
     preprocessing_complete = pyqtSignal()
-    
+    # Signal to notify when data has been modified
+    data_modified = pyqtSignal()
+
     def __init__(self, data_manager):
         """Initialize the preprocessing panel."""
         super().__init__()
@@ -1897,6 +1899,7 @@ class PreprocessingPanel(QWidget):
 
             self.update_data_view()
             self.preprocessing_complete.emit()
+            self.data_modified.emit()
             QMessageBox.information(self, "Success", f"Missing values handled using '{action}'.")
 
         except Exception as e:
@@ -1927,6 +1930,7 @@ class PreprocessingPanel(QWidget):
 
             self.update_data_view()
             self.preprocessing_complete.emit()
+            self.data_modified.emit()
             QMessageBox.information(self, "Success", f"Removed {removed} duplicate rows.")
 
         except Exception as e:

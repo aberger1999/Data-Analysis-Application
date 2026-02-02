@@ -17,6 +17,7 @@ from .preprocessing_panel import PreprocessingPanel
 from .feature_engineering_panel import FeatureEngineeringPanel
 from .machine_learning_panel import MachineLearningPanel
 from .report_generator_panel import ReportGeneratorPanel
+from .dataset_manager_panel import DatasetManagerDialog
 from ..data_manager import DataManager
 
 class WorkspaceView(QWidget):
@@ -30,6 +31,8 @@ class WorkspaceView(QWidget):
         self.workspace_id = None
         self.workspace_path = None
         self.workspace_name = ""
+        self.has_unsaved_changes = False
+        self.dataset_manager_dialog = None
         self.init_ui()
         self.setup_connections()
 
@@ -134,7 +137,7 @@ class WorkspaceView(QWidget):
         header_layout.setContentsMargins(20, 15, 20, 15)
 
         self.back_btn = QPushButton("← Back to Home")
-        self.back_btn.clicked.connect(self.back_to_home.emit)
+        self.back_btn.clicked.connect(self.on_back_clicked)
         header_layout.addWidget(self.back_btn)
 
         header_layout.addSpacing(20)
@@ -147,6 +150,23 @@ class WorkspaceView(QWidget):
         header_layout.addWidget(self.workspace_label)
 
         header_layout.addStretch()
+
+        self.dataset_manager_btn = QPushButton("📊 Dataset Manager")
+        self.dataset_manager_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4d4d4d;
+                border: none;
+                border-radius: 6px;
+                padding: 8px 16px;
+                font-size: 10pt;
+                color: white;
+            }
+            QPushButton:hover {
+                background-color: #5d5d5d;
+            }
+        """)
+        self.dataset_manager_btn.clicked.connect(self.show_dataset_manager)
+        header_layout.addWidget(self.dataset_manager_btn)
 
         self.load_btn = QPushButton("📂 Import CSV")
         self.load_btn.setStyleSheet("""
@@ -166,20 +186,25 @@ class WorkspaceView(QWidget):
         self.load_btn.clicked.connect(self.load_data)
         header_layout.addWidget(self.load_btn)
 
-        self.save_btn = QPushButton("📤 Export CSV")
+        self.save_btn = QPushButton("💾 Save Workspace")
         self.save_btn.setEnabled(False)
-        self.save_btn.clicked.connect(self.save_data)
+        self.save_btn.clicked.connect(self.save_workspace)
         header_layout.addWidget(self.save_btn)
+
+        self.export_btn = QPushButton("📤 Export CSV")
+        self.export_btn.setEnabled(False)
+        self.export_btn.clicked.connect(self.save_data)
+        header_layout.addWidget(self.export_btn)
 
         layout.addWidget(self.header_frame)
 
         content_layout = QVBoxLayout()
         content_layout.setContentsMargins(10, 10, 10, 10)
 
-        splitter = QSplitter(Qt.Orientation.Horizontal)
+        main_splitter = QSplitter(Qt.Orientation.Horizontal)
 
         self.data_preview = DataPreviewPanel(self.data_manager)
-        splitter.addWidget(self.data_preview)
+        main_splitter.addWidget(self.data_preview)
 
         self.tabs = QTabWidget()
 
@@ -188,39 +213,45 @@ class WorkspaceView(QWidget):
         # Apply initial theme (will be updated by MainWindow)
         self.update_theme("dark")
         self.tabs.addTab(self.preprocessing_panel, "🔧 Preprocessing")
-        
+
         self.analysis_panel = AnalysisPanel(self.data_manager)
         self.tabs.addTab(self.analysis_panel, "📊 Analysis")
-        
+
         self.visualization_panel = VisualizationPanel(self.data_manager)
         self.tabs.addTab(self.visualization_panel, "📈 Visualization")
-        
+
         self.feature_engineering_panel = FeatureEngineeringPanel(self.data_manager)
         self.tabs.addTab(self.feature_engineering_panel, "⚙️ Feature Engineering")
-        
+
         self.machine_learning_panel = MachineLearningPanel(self.data_manager)
         self.tabs.addTab(self.machine_learning_panel, "🤖 Machine Learning")
-        
+
         self.report_generator_panel = ReportGeneratorPanel(self.data_manager)
         self.tabs.addTab(self.report_generator_panel, "📄 Reports")
-        
-        splitter.addWidget(self.tabs)
-        
-        splitter.setSizes([400, 800])
-        
-        content_layout.addWidget(splitter)
+
+        main_splitter.addWidget(self.tabs)
+        main_splitter.setSizes([400, 800])
+
+        content_layout.addWidget(main_splitter)
         layout.addLayout(content_layout)
         
     def setup_connections(self):
         """Setup signal connections."""
         self.data_manager.data_error.connect(self.show_error)
         self.data_manager.data_loaded.connect(self.on_data_loaded)
-        
+
+        self.preprocessing_panel.data_modified.connect(self.mark_unsaved_changes)
+        self.feature_engineering_panel.data_modified.connect(self.mark_unsaved_changes)
+
+        self.back_btn.clicked.disconnect()
+        self.back_btn.clicked.connect(self.on_back_clicked)
+
     def set_workspace(self, workspace_id, workspace_path, workspace_name):
         """Set the active workspace."""
         self.workspace_id = workspace_id
         self.workspace_path = workspace_path
         self.workspace_name = workspace_name
+        self.has_unsaved_changes = False
 
         self.workspace_label.setText(f"📁 {workspace_name}")
 
@@ -284,10 +315,130 @@ class WorkspaceView(QWidget):
                     f"Error saving data: {str(e)}"
                 )
     
+    def load_dataset_from_manager(self, file_path):
+        """Load a dataset selected from the dataset manager."""
+        if self.has_unsaved_changes:
+            reply = QMessageBox.question(
+                self,
+                "Unsaved Changes",
+                "You have unsaved changes. Do you want to save before loading a new dataset?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel
+            )
+
+            if reply == QMessageBox.StandardButton.Cancel:
+                return
+            elif reply == QMessageBox.StandardButton.Yes:
+                self.save_workspace()
+
+        self.data_manager.load_csv(file_path)
+        self.has_unsaved_changes = False
+        self.update_save_button()
+
+        if self.dataset_manager_dialog:
+            filename = os.path.basename(file_path)
+            self.dataset_manager_dialog.set_current_dataset(filename)
+
+    def on_dataset_deleted(self, filename):
+        """Handle dataset deletion."""
+        if self.data_manager.data is not None:
+            current_file = os.path.join(self.workspace_path, "data", "workspace_data.csv")
+            if os.path.exists(current_file):
+                self.data_manager.load_workspace_data()
+
+    def on_dataset_renamed(self, old_name, new_name):
+        """Handle dataset rename."""
+        pass
+
+    def show_dataset_manager(self):
+        """Show the dataset manager dialog."""
+        if not self.dataset_manager_dialog:
+            self.dataset_manager_dialog = DatasetManagerDialog(self)
+            self.dataset_manager_dialog.dataset_selected.connect(self.load_dataset_from_manager)
+            self.dataset_manager_dialog.dataset_deleted.connect(self.on_dataset_deleted)
+            self.dataset_manager_dialog.dataset_renamed.connect(self.on_dataset_renamed)
+
+        self.dataset_manager_dialog.set_workspace(self.workspace_path)
+        self.dataset_manager_dialog.exec()
+
+    def mark_unsaved_changes(self):
+        """Mark that there are unsaved changes."""
+        self.has_unsaved_changes = True
+        self.update_save_button()
+
+    def update_save_button(self):
+        """Update the save button state."""
+        has_data = self.data_manager.data is not None
+        self.save_btn.setEnabled(has_data)
+        self.export_btn.setEnabled(has_data)
+
+        if self.has_unsaved_changes and has_data:
+            self.save_btn.setText("💾 Save Workspace *")
+            self.save_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #f59e0b;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    padding: 8px 16px;
+                    font-size: 10pt;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #d97706;
+                }
+            """)
+        else:
+            self.save_btn.setText("💾 Save Workspace")
+            self.save_btn.setStyleSheet("")
+
+    def save_workspace(self):
+        """Save the current workspace data."""
+        if self.data_manager.data is None:
+            return
+
+        try:
+            self.data_manager.save_workspace_data()
+            self.has_unsaved_changes = False
+            self.update_save_button()
+
+            if self.dataset_manager_dialog:
+                self.dataset_manager_dialog.set_current_dataset("workspace_data.csv")
+
+            QMessageBox.information(
+                self,
+                "Success",
+                "Workspace data saved successfully!"
+            )
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Error saving workspace: {str(e)}"
+            )
+
+    def on_back_clicked(self):
+        """Handle back button click with unsaved changes check."""
+        if self.has_unsaved_changes:
+            reply = QMessageBox.question(
+                self,
+                "Unsaved Changes",
+                "You have unsaved changes. Do you want to save before leaving?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel
+            )
+
+            if reply == QMessageBox.StandardButton.Cancel:
+                return
+            elif reply == QMessageBox.StandardButton.Yes:
+                self.save_workspace()
+
+        self.back_to_home.emit()
+
     def on_data_loaded(self, df):
         """Handle when data is loaded."""
-        self.save_btn.setEnabled(True)
-        
+        self.update_save_button()
+        if self.dataset_manager_dialog:
+            self.dataset_manager_dialog.refresh_dataset_list()
+
     def show_error(self, message):
         """Show error message."""
         QMessageBox.critical(self, "Error", message)

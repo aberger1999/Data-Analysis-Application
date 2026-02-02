@@ -3,7 +3,7 @@ Main window for the Data Analysis Application.
 """
 
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QStackedWidget, QApplication
+    QMainWindow, QWidget, QVBoxLayout, QStackedWidget, QApplication, QMessageBox
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPalette, QColor, QIcon
@@ -220,4 +220,23 @@ class MainWindow(QMainWindow):
 
     def show_error(self, message):
         """Show error message dialog."""
-        QMessageBox.critical(self, "Error", message) 
+        QMessageBox.critical(self, "Error", message)
+
+    def closeEvent(self, event):
+        """Handle window close event with unsaved changes check."""
+        if self.stacked_widget.currentWidget() == self.workspace_view:
+            if self.workspace_view.has_unsaved_changes:
+                reply = QMessageBox.question(
+                    self,
+                    "Unsaved Changes",
+                    "You have unsaved changes. Do you want to save before exiting?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel
+                )
+
+                if reply == QMessageBox.StandardButton.Cancel:
+                    event.ignore()
+                    return
+                elif reply == QMessageBox.StandardButton.Yes:
+                    self.workspace_view.save_workspace()
+
+        event.accept() 

@@ -2,14 +2,14 @@
 Analysis panel for data analysis operations.
 """
 
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFrame,
     QLabel, QComboBox, QPushButton, QTableWidget,
     QTableWidgetItem, QStackedWidget, QMessageBox,
     QGridLayout, QSplitter, QSizePolicy, QStyledItemDelegate
 )
-from PyQt6.QtCore import Qt, QRect
-from PyQt6.QtGui import QColor, QFont, QPainter, QBrush
+from PyQt5.QtCore import Qt, QRect
+from PyQt5.QtGui import QColor, QFont, QPainter, QBrush
 import pandas as pd
 import numpy as np
 import matplotlib

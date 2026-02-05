@@ -2,14 +2,14 @@
 Modern home screen for workspace selection and settings.
 """
 
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
     QPushButton, QFrame, QGridLayout, QScrollArea,
     QDialog, QLineEdit, QMessageBox, QGroupBox,
     QComboBox, QCheckBox, QSpinBox
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QPropertyAnimation, QEasingCurve, QRect
-from PyQt6.QtGui import QFont, QIcon, QPalette, QColor
+from PyQt5.QtCore import Qt, pyqtSignal, QPropertyAnimation, QEasingCurve, QRect
+from PyQt5.QtGui import QFont, QIcon, QPalette, QColor
 import os
 import json
 from datetime import datetime

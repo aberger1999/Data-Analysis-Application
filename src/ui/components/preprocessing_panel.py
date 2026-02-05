@@ -2,7 +2,7 @@
 Preprocessing panel for data cleaning and transformation operations.
 """
 
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFrame,
     QLabel, QComboBox, QPushButton, QSpinBox,
     QGridLayout, QTabWidget, QLineEdit, QCheckBox,
@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QScrollArea, QGroupBox, QProgressDialog, QApplication,
     QMenu, QInputDialog
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 import pandas as pd
 import numpy as np
 from scipy import stats
@@ -1211,7 +1211,7 @@ class PreprocessingPanel(QWidget):
         if self.data_manager.data is None:
             return
             
-        from PyQt6.QtWidgets import QFileDialog
+        from PyQt5.QtWidgets import QFileDialog
         
         file_name, _ = QFileDialog.getSaveFileName(
             self,

@@ -2,14 +2,14 @@
 Machine learning panel for model training, evaluation, and predictions.
 """
 
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
     QLabel, QComboBox, QPushButton, QSpinBox,
     QGridLayout, QTabWidget, QLineEdit, QCheckBox,
     QTableWidget, QTableWidgetItem, QMessageBox,
     QDoubleSpinBox, QScrollArea, QFrame
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split, cross_val_score

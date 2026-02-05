@@ -4,7 +4,7 @@ Data manager for handling CSV file operations and data storage.
 
 import pandas as pd
 import numpy as np
-from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt5.QtCore import QObject, pyqtSignal
 from scipy import stats
 
 class DataManager(QObject):

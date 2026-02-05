@@ -2,13 +2,13 @@
 Workspace manager panel for organizing data files, graphs, and reports.
 """
 
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
     QLabel, QPushButton, QGridLayout, QMessageBox,
     QFrame, QScrollArea, QFileDialog, QLineEdit
 )
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QFont, QIcon
+from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtGui import QFont, QIcon
 import os
 import json
 import shutil

@@ -2,14 +2,14 @@
 Report generator panel for creating comprehensive data analysis reports.
 """
 
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
     QLabel, QComboBox, QPushButton, QSpinBox,
     QGridLayout, QTabWidget, QLineEdit, QCheckBox,
     QTableWidget, QTableWidgetItem, QMessageBox,
     QTextEdit, QFileDialog
 )
-from PyQt6.QtCore import Qt
+from PyQt5.QtCore import Qt
 import pandas as pd
 import numpy as np
 from datetime import datetime

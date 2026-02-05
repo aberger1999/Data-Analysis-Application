@@ -1,6 +1,6 @@
 """
 Main entry point for the Data Analysis Application.
-This module initializes the PyQt6 application and launches the main window.
+This module initializes the PyQt5 application and launches the main window.
 Cross-platform support for Windows and macOS.
 """
 
@@ -9,9 +9,9 @@ import os
 import warnings
 import platform
 
-from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import QLibraryInfo, Qt
-from PyQt6.QtGui import QPalette, QColor, QIcon
+from PyQt5.QtWidgets import QApplication
+from PyQt5.QtCore import QLibraryInfo, Qt
+from PyQt5.QtGui import QPalette, QColor, QIcon
 from ui.main_window import MainWindow
 
 if platform.system() == 'Darwin':
@@ -237,7 +237,7 @@ def main():
             windll.shell32.SetCurrentProcessExplicitAppUserModelID('com.dataanalysis.app')
         except:
             pass
-        
+
         # Fix DLL loading issue with Anaconda Python
         # Prioritize virtual environment's DLLs over Anaconda's base environment
         venv_scripts = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'venv', 'Scripts')
@@ -246,7 +246,7 @@ def main():
             if venv_scripts not in current_path:
                 os.environ['PATH'] = venv_scripts + os.pathsep + current_path
 
-    plugins_path = QLibraryInfo.path(QLibraryInfo.LibraryPath.PluginsPath)
+    plugins_path = QLibraryInfo.location(QLibraryInfo.PluginsPath)
     os.environ['QT_QPA_PLATFORM_PLUGIN_PATH'] = plugins_path
 
     app = QApplication(sys.argv)
@@ -254,7 +254,6 @@ def main():
     app.setOrganizationName("DataAnalysis")
     app.setOrganizationDomain("dataanalysis.app")
 
-    # Set application icon (works in both dev and packaged mode)
     icon_path = resource_path('icon.png')
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))

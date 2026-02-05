@@ -2,11 +2,11 @@
 Main window for the Data Analysis Application.
 """
 
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QStackedWidget, QApplication, QMessageBox
 )
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QPalette, QColor, QIcon
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPalette, QColor, QIcon
 from .components.home_screen import HomeScreen
 from .components.workspace_view import WorkspaceView
 import json

@@ -5,13 +5,13 @@ Dataset manager dialog for managing datasets within a workspace.
 import os
 import shutil
 from datetime import datetime
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
     QListWidget, QListWidgetItem, QMessageBox, QFileDialog,
     QInputDialog, QLabel, QMenu, QWidget
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QSize
-from PyQt6.QtGui import QIcon, QFont, QColor
+from PyQt5.QtCore import Qt, pyqtSignal, QSize
+from PyQt5.QtGui import QIcon, QFont, QColor
 
 class DatasetItem(QWidget):
     """Custom widget for dataset list items."""

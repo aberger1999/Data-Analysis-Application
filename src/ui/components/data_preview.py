@@ -2,12 +2,12 @@
 Data preview panel for displaying and basic manipulation of loaded data.
 """
 
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem,
     QLabel, QHeaderView, QHBoxLayout, QPushButton, QSpinBox,
     QComboBox, QLineEdit, QGroupBox, QGridLayout
 )
-from PyQt6.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QTimer
 import pandas as pd
 
 class DataPreviewPanel(QWidget):
@@ -177,7 +177,7 @@ class DataPreviewPanel(QWidget):
             self.update_table_view()
             
         except Exception as e:
-            from PyQt6.QtWidgets import QMessageBox
+            from PyQt5.QtWidgets import QMessageBox
             QMessageBox.warning(self, "Filter Error", f"Error applying filter: {str(e)}")
         
     def clear_filter(self):
@@ -296,7 +296,7 @@ class DataPreviewPanel(QWidget):
             self.data_manager.data_loaded.emit(self.data_manager._data)
             
         except Exception as e:
-            from PyQt6.QtWidgets import QMessageBox
+            from PyQt5.QtWidgets import QMessageBox
             QMessageBox.warning(self, "Edit Error", f"Error updating cell value: {str(e)}")
             # Revert to the original value
             self.update_current_page()

@@ -2,7 +2,7 @@
 Visualization panel for creating and customizing data visualizations.
 """
 
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFrame,
     QLabel, QComboBox, QPushButton, QScrollArea,
     QGridLayout, QSpinBox, QColorDialog, QCheckBox,
@@ -10,8 +10,8 @@ from PyQt6.QtWidgets import (
     QSizePolicy, QGroupBox, QTabWidget, QSplitter,
     QLineEdit
 )
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QColor
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QColor
 import matplotlib
 matplotlib.use('Qt5Agg')  # Set the backend before importing pyplot
 import matplotlib.pyplot as plt

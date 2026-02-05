@@ -2,13 +2,13 @@
 Workspace view containing all data analysis tools.
 """
 
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QFrame, QSplitter, QTabWidget, QFileDialog,
     QMessageBox
 )
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QFont
+from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtGui import QFont
 import os
 from .data_preview import DataPreviewPanel
 from .analysis_panel import AnalysisPanel

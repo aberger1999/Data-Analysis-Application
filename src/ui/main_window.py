@@ -1,14 +1,15 @@
 """
-Main window for the Data Analysis Application.
+Main window for the DataLens application.
 """
 
 from PyQt5.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QStackedWidget, QApplication, QMessageBox
+    QMainWindow, QWidget, QVBoxLayout, QStackedWidget, QApplication
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPalette, QColor, QIcon
 from .components.home_screen import HomeScreen
 from .components.workspace_view import WorkspaceView
+from .components import modal
 from .theme import apply_theme, get_colors
 import json
 import os
@@ -37,7 +38,7 @@ class MainWindow(QMainWindow):
 
     def init_ui(self):
         """Initialize the user interface."""
-        self.setWindowTitle("Data Analysis Application")
+        self.setWindowTitle("DataLens")
         self.setMinimumSize(1200, 800)
 
         icon_path = self._resource_path('icon.png')
@@ -96,23 +97,22 @@ class MainWindow(QMainWindow):
 
     def show_error(self, message):
         """Show error message dialog."""
-        QMessageBox.critical(self, "Error", message)
+        modal.show_error(self, "Error", message)
 
     def closeEvent(self, event):
         """Handle window close event with unsaved changes check."""
         if self.stacked_widget.currentWidget() == self.workspace_view:
             if self.workspace_view.has_unsaved_changes:
-                reply = QMessageBox.question(
+                result = modal.show_question_3way(
                     self,
                     "Unsaved Changes",
-                    "You have unsaved changes. Do you want to save before exiting?",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel
+                    "You have unsaved changes. Do you want to save before exiting?"
                 )
 
-                if reply == QMessageBox.StandardButton.Cancel:
+                if result == "cancel":
                     event.ignore()
                     return
-                elif reply == QMessageBox.StandardButton.Yes:
+                elif result == "yes":
                     self.workspace_view.save_workspace()
 
         event.accept() 

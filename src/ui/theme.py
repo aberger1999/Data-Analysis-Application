@@ -1,6 +1,7 @@
 """
-Centralized theme system for the Data Analysis Application.
-Provides modern, consistent styling across all components.
+Centralized theme system for the DataLens application.
+Deep navy/slate dark theme with indigo accent. Every color, radius,
+and spacing token lives here so the look can be tuned in one place.
 """
 
 from PyQt5.QtGui import QPalette, QColor, QFont
@@ -10,88 +11,110 @@ from PyQt5.QtWidgets import QApplication
 # ── Design Tokens ──────────────────────────────────────────────────────────
 
 DARK = {
-    # Surfaces
-    "bg_primary":      "#1a1b2e",   # Main background - deep navy
-    "bg_secondary":    "#222340",   # Cards, panels
-    "bg_tertiary":     "#2a2b4a",   # Elevated surfaces
-    "bg_input":        "#161728",   # Input fields
-    "bg_hover":        "#32335a",   # Hover state
+    # Surfaces  (deep navy / slate)
+    "bg_base":         "#0f1117",   # Deepest background (window chrome)
+    "bg_primary":      "#131620",   # Main content background
+    "bg_secondary":    "#1a1f2e",   # Panels, sidebars
+    "bg_tertiary":     "#252b3b",   # Cards, elevated surfaces
+    "bg_input":        "#1e2433",   # Input fields, wells
+    "bg_hover":        "#2d3548",   # Hover state on surfaces
+    "bg_active":       "#343d52",   # Pressed / active state
 
     # Borders
-    "border":          "#3a3b5c",   # Default border
-    "border_subtle":   "#2e2f50",   # Subtle dividers
-    "border_focus":    "#6c63ff",   # Focus ring
+    "border":          "rgba(255,255,255,0.10)",   # Default border
+    "border_subtle":   "rgba(255,255,255,0.06)",   # Very faint dividers
+    "border_medium":   "rgba(255,255,255,0.15)",   # Input borders
+    "border_focus":    "#6366f1",                    # Focus ring
 
     # Text
-    "text_primary":    "#e8e9f0",   # Primary text
-    "text_secondary":  "#9496b0",   # Secondary / muted
-    "text_disabled":   "#5a5c7a",   # Disabled
+    "text_primary":    "#e2e4ed",   # Primary text
+    "text_secondary":  "#8b8fa3",   # Secondary / muted
+    "text_disabled":   "#4b5063",   # Disabled
     "text_inverse":    "#ffffff",   # On accent backgrounds
+    "text_label":      "#6b7280",   # Small labels, captions
 
-    # Accent
-    "accent":          "#6c63ff",   # Primary accent - vibrant purple
-    "accent_hover":    "#7d75ff",   # Accent hover
-    "accent_pressed":  "#5b52e0",   # Accent pressed
-    "accent_subtle":   "#6c63ff22", # Accent with transparency
+    # Accent  (indigo)
+    "accent":          "#6366f1",   # Primary accent
+    "accent_hover":    "#7577f5",   # Accent hover
+    "accent_pressed":  "#5254cc",   # Accent pressed
+    "accent_subtle":   "rgba(99,102,241,0.12)",  # Accent tint for backgrounds
+    "accent_glow":     "rgba(99,102,241,0.35)",  # Focus glow
 
     # Semantic
     "success":         "#10b981",
+    "success_hover":   "#059669",
     "warning":         "#f59e0b",
+    "warning_hover":   "#d97706",
     "danger":          "#ef4444",
     "danger_hover":    "#dc2626",
     "info":            "#3b82f6",
 
-    # Specific
-    "tab_active":      "#6c63ff",
-    "scrollbar_bg":    "#1a1b2e",
-    "scrollbar_handle": "#3a3b5c",
-    "scrollbar_hover": "#6c63ff",
-    "table_alt":       "#1f2038",
-    "table_grid":      "#2e2f50",
-    "selection":       "#6c63ff",
-    "header_bg":       "#222340",
+    # Table
+    "table_alt":       "#161b27",   # Alternating row
+    "table_grid":      "rgba(255,255,255,0.05)",
+    "table_header":    "#1e2536",
+
+    # Scrollbar
+    "scrollbar_bg":    "#0f1117",
+    "scrollbar_handle": "#2d3548",
+    "scrollbar_hover": "#6366f1",
+
+    # Selection
+    "selection":       "#6366f1",
+    "header_bg":       "#1a1f2e",
 }
 
 LIGHT = {
     # Surfaces
+    "bg_base":         "#f0f2f5",
     "bg_primary":      "#f5f6fa",
     "bg_secondary":    "#ffffff",
     "bg_tertiary":     "#ecedf5",
     "bg_input":        "#ffffff",
     "bg_hover":        "#e8e9f5",
+    "bg_active":       "#dddff0",
 
     # Borders
-    "border":          "#d1d3e0",
-    "border_subtle":   "#e5e7f0",
-    "border_focus":    "#6c63ff",
+    "border":          "rgba(0,0,0,0.10)",
+    "border_subtle":   "rgba(0,0,0,0.06)",
+    "border_medium":   "rgba(0,0,0,0.15)",
+    "border_focus":    "#6366f1",
 
     # Text
     "text_primary":    "#1a1b2e",
     "text_secondary":  "#6b6d85",
     "text_disabled":   "#a0a2b5",
     "text_inverse":    "#ffffff",
+    "text_label":      "#6b7280",
 
     # Accent
-    "accent":          "#6c63ff",
-    "accent_hover":    "#5b52e0",
-    "accent_pressed":  "#4a42c8",
-    "accent_subtle":   "#6c63ff18",
+    "accent":          "#6366f1",
+    "accent_hover":    "#5254cc",
+    "accent_pressed":  "#4345b0",
+    "accent_subtle":   "rgba(99,102,241,0.10)",
+    "accent_glow":     "rgba(99,102,241,0.25)",
 
     # Semantic
     "success":         "#059669",
+    "success_hover":   "#047857",
     "warning":         "#d97706",
+    "warning_hover":   "#b45309",
     "danger":          "#dc2626",
     "danger_hover":    "#b91c1c",
     "info":            "#2563eb",
 
-    # Specific
-    "tab_active":      "#6c63ff",
+    # Table
+    "table_alt":       "#f8f9fc",
+    "table_grid":      "rgba(0,0,0,0.06)",
+    "table_header":    "#f0f1f8",
+
+    # Scrollbar
     "scrollbar_bg":    "#f5f6fa",
     "scrollbar_handle": "#c0c2d0",
-    "scrollbar_hover": "#6c63ff",
-    "table_alt":       "#f8f9fc",
-    "table_grid":      "#e5e7f0",
-    "selection":       "#6c63ff",
+    "scrollbar_hover": "#6366f1",
+
+    # Selection
+    "selection":       "#6366f1",
     "header_bg":       "#ffffff",
 }
 
@@ -101,17 +124,23 @@ PALETTES = {"dark": DARK, "light": LIGHT}
 # ── Font ───────────────────────────────────────────────────────────────────
 
 FONT_FAMILY = "Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif"
-FONT_SIZE = "10pt"
+FONT_SIZE   = "10pt"
 FONT_SIZE_SMALL = "9pt"
 FONT_SIZE_LARGE = "11pt"
+FONT_SIZE_XS = "8pt"
 
 
-# ── Radius & Spacing ──────────────────────────────────────────────────────
+# ── Radius & Spacing ────────────────────────────────────────────────────
 
 RADIUS_SM = "4px"
-RADIUS_MD = "8px"
-RADIUS_LG = "12px"
-RADIUS_XL = "16px"
+RADIUS_MD = "6px"
+RADIUS_LG = "10px"
+RADIUS_XL = "14px"
+
+BTN_HEIGHT   = "34px"
+BTN_PADDING  = "7px 16px"
+INPUT_PADDING = "6px 10px"
+CARD_PADDING = "16px"
 
 
 # ── Stylesheet Builder ────────────────────────────────────────────────────
@@ -121,29 +150,35 @@ def build_stylesheet(theme: str = "dark") -> str:
     c = PALETTES.get(theme, DARK)
 
     return f"""
-    /* ── Global ──────────────────────────────────────────────── */
+    /* ================================================================
+       GLOBAL
+       ================================================================ */
     QWidget {{
         font-family: {FONT_FAMILY};
         font-size: {FONT_SIZE};
         color: {c["text_primary"]};
+        outline: none;
     }}
-
     QMainWindow {{
-        background-color: {c["bg_primary"]};
+        background-color: {c["bg_base"]};
     }}
-
     QDialog {{
         background-color: {c["bg_primary"]};
         color: {c["text_primary"]};
     }}
 
-    /* ── Buttons ─────────────────────────────────────────────── */
+    /* ================================================================
+       BUTTONS
+       ================================================================ */
+
+    /* -- Default (outlined / ghost) --------------------------------- */
     QPushButton {{
         background-color: {c["bg_tertiary"]};
         color: {c["text_primary"]};
         border: 1px solid {c["border"]};
-        padding: 7px 16px;
+        padding: {BTN_PADDING};
         border-radius: {RADIUS_MD};
+        min-height: 20px;
         font-weight: 500;
     }}
     QPushButton:hover {{
@@ -160,53 +195,118 @@ def build_stylesheet(theme: str = "dark") -> str:
         color: {c["text_disabled"]};
         border-color: {c["border_subtle"]};
     }}
+    QPushButton:checked {{
+        background-color: {c["accent"]};
+        color: {c["text_inverse"]};
+        border-color: {c["accent"]};
+        font-weight: 600;
+    }}
 
-    /* Primary button via property */
+    /* -- Primary (accent filled) ----------------------------------- */
     QPushButton[cssClass="primary"] {{
         background-color: {c["accent"]};
         color: {c["text_inverse"]};
-        border: none;
+        border: 1px solid {c["accent"]};
         font-weight: 600;
     }}
     QPushButton[cssClass="primary"]:hover {{
         background-color: {c["accent_hover"]};
+        border-color: {c["accent_hover"]};
     }}
     QPushButton[cssClass="primary"]:pressed {{
         background-color: {c["accent_pressed"]};
     }}
+    QPushButton[cssClass="primary"]:disabled {{
+        background-color: {c["bg_primary"]};
+        color: {c["text_disabled"]};
+        border-color: {c["border_subtle"]};
+    }}
 
+    /* -- Success (green filled) ------------------------------------ */
+    QPushButton[cssClass="success"] {{
+        background-color: {c["success"]};
+        color: {c["text_inverse"]};
+        border: 1px solid {c["success"]};
+        font-weight: 600;
+    }}
+    QPushButton[cssClass="success"]:hover {{
+        background-color: {c["success_hover"]};
+        border-color: {c["success_hover"]};
+    }}
+    QPushButton[cssClass="success"]:disabled {{
+        background-color: {c["bg_primary"]};
+        color: {c["text_disabled"]};
+        border-color: {c["border_subtle"]};
+    }}
+
+    /* -- Danger (red filled) --------------------------------------- */
     QPushButton[cssClass="danger"] {{
         background-color: {c["danger"]};
         color: {c["text_inverse"]};
-        border: none;
+        border: 1px solid {c["danger"]};
         font-weight: 600;
     }}
     QPushButton[cssClass="danger"]:hover {{
         background-color: {c["danger_hover"]};
+        border-color: {c["danger_hover"]};
     }}
 
-    QPushButton[cssClass="success"] {{
-        background-color: {c["success"]};
-        color: {c["text_inverse"]};
+    /* -- Outline (subtle, secondary actions) ----------------------- */
+    QPushButton[cssClass="outline"] {{
+        background-color: transparent;
+        color: {c["text_primary"]};
+        border: 1px solid {c["border_medium"]};
+    }}
+    QPushButton[cssClass="outline"]:hover {{
+        background-color: {c["bg_hover"]};
+        border-color: {c["accent"]};
+        color: {c["accent"]};
+    }}
+
+    /* -- Ghost (no background, compact) ----------------------------- */
+    QPushButton[cssClass="ghost"] {{
+        background-color: transparent;
+        color: {c["text_primary"]};
         border: none;
+        padding: 2px;
+        min-height: 0px;
+    }}
+    QPushButton[cssClass="ghost"]:hover {{
+        background-color: {c["bg_hover"]};
+        color: {c["text_primary"]};
+    }}
+
+    /* -- Warning (amber filled) ------------------------------------ */
+    QPushButton[cssClass="warning"] {{
+        background-color: {c["warning"]};
+        color: {c["text_inverse"]};
+        border: 1px solid {c["warning"]};
         font-weight: 600;
     }}
-    QPushButton[cssClass="success"]:hover {{
-        background-color: {"#059669" if theme == "dark" else "#047857"};
+    QPushButton[cssClass="warning"]:hover {{
+        background-color: {c["warning_hover"]};
+        border-color: {c["warning_hover"]};
     }}
 
-    /* ── Inputs ──────────────────────────────────────────────── */
+    /* ================================================================
+       INPUTS  (text, spin, double-spin)
+       ================================================================ */
     QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox, QDoubleSpinBox {{
         background-color: {c["bg_input"]};
         color: {c["text_primary"]};
-        border: 1px solid {c["border"]};
-        padding: 6px 10px;
-        border-radius: {RADIUS_SM};
+        border: 1px solid {c["border_medium"]};
+        padding: {INPUT_PADDING};
+        border-radius: {RADIUS_MD};
         selection-background-color: {c["accent"]};
     }}
     QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus,
     QSpinBox:focus, QDoubleSpinBox:focus {{
         border-color: {c["accent"]};
+    }}
+    QLineEdit:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled {{
+        background-color: {c["bg_primary"]};
+        color: {c["text_disabled"]};
+        border-color: {c["border_subtle"]};
     }}
 
     QSpinBox::up-button, QSpinBox::down-button,
@@ -214,23 +314,34 @@ def build_stylesheet(theme: str = "dark") -> str:
         background-color: {c["bg_tertiary"]};
         border: none;
         width: 20px;
+        border-radius: 2px;
     }}
     QSpinBox::up-button:hover, QSpinBox::down-button:hover,
     QDoubleSpinBox::up-button:hover, QDoubleSpinBox::down-button:hover {{
         background-color: {c["bg_hover"]};
     }}
 
-    /* ── ComboBox ─────────────────────────────────────────────── */
+    /* ================================================================
+       COMBOBOX
+       ================================================================ */
     QComboBox {{
         background-color: {c["bg_input"]};
         color: {c["text_primary"]};
-        border: 1px solid {c["border"]};
-        padding: 6px 10px;
-        border-radius: {RADIUS_SM};
+        border: 1px solid {c["border_medium"]};
+        padding: {INPUT_PADDING};
+        border-radius: {RADIUS_MD};
         min-height: 18px;
     }}
     QComboBox:hover {{
         border-color: {c["accent"]};
+    }}
+    QComboBox:focus {{
+        border-color: {c["accent"]};
+    }}
+    QComboBox:disabled {{
+        background-color: {c["bg_primary"]};
+        color: {c["text_disabled"]};
+        border-color: {c["border_subtle"]};
     }}
     QComboBox::drop-down {{
         border: none;
@@ -243,9 +354,13 @@ def build_stylesheet(theme: str = "dark") -> str:
         selection-background-color: {c["accent"]};
         selection-color: {c["text_inverse"]};
         outline: none;
+        padding: 4px;
+        border-radius: {RADIUS_MD};
     }}
 
-    /* ── CheckBox & RadioButton ──────────────────────────────── */
+    /* ================================================================
+       CHECKBOX  &  RADIOBUTTON
+       ================================================================ */
     QCheckBox {{
         spacing: 8px;
         color: {c["text_primary"]};
@@ -253,7 +368,7 @@ def build_stylesheet(theme: str = "dark") -> str:
     QCheckBox::indicator {{
         width: 18px;
         height: 18px;
-        border: 2px solid {c["border"]};
+        border: 2px solid {c["border_medium"]};
         border-radius: {RADIUS_SM};
         background-color: {c["bg_input"]};
     }}
@@ -264,6 +379,9 @@ def build_stylesheet(theme: str = "dark") -> str:
     QCheckBox::indicator:hover {{
         border-color: {c["accent"]};
     }}
+    QCheckBox:disabled {{
+        color: {c["text_disabled"]};
+    }}
 
     QRadioButton {{
         spacing: 8px;
@@ -272,7 +390,7 @@ def build_stylesheet(theme: str = "dark") -> str:
     QRadioButton::indicator {{
         width: 18px;
         height: 18px;
-        border: 2px solid {c["border"]};
+        border: 2px solid {c["border_medium"]};
         border-radius: 9px;
         background-color: {c["bg_input"]};
     }}
@@ -281,33 +399,43 @@ def build_stylesheet(theme: str = "dark") -> str:
         border-color: {c["accent"]};
     }}
 
-    /* ── Table ────────────────────────────────────────────────── */
+    /* ================================================================
+       TABLE
+       ================================================================ */
     QTableWidget, QTableView {{
         background-color: {c["bg_secondary"]};
         alternate-background-color: {c["table_alt"]};
         gridline-color: {c["table_grid"]};
-        border: 1px solid {c["border_subtle"]};
-        border-radius: {RADIUS_SM};
+        border: 1px solid {c["border"]};
+        border-radius: {RADIUS_MD};
         selection-background-color: {c["selection"]};
         selection-color: {c["text_inverse"]};
     }}
     QTableWidget::item, QTableView::item {{
-        padding: 4px 8px;
+        padding: 5px 10px;
+        border-bottom: 1px solid {c["table_grid"]};
+    }}
+    QTableWidget::item:hover, QTableView::item:hover {{
+        background-color: {c["bg_hover"]};
     }}
     QHeaderView::section {{
-        background-color: {c["bg_tertiary"]};
-        color: {c["text_primary"]};
-        padding: 6px 10px;
+        background-color: {c["table_header"]};
+        color: {c["text_secondary"]};
+        padding: 8px 10px;
         border: none;
-        border-right: 1px solid {c["border_subtle"]};
-        border-bottom: 1px solid {c["border_subtle"]};
+        border-right: 1px solid {c["table_grid"]};
+        border-bottom: 2px solid {c["border"]};
         font-weight: 600;
+        font-size: {FONT_SIZE_SMALL};
+        text-transform: uppercase;
     }}
 
-    /* ── Tabs ────────────────────────────────────────────────── */
+    /* ================================================================
+       TABS
+       ================================================================ */
     QTabWidget::pane {{
-        border: 1px solid {c["border_subtle"]};
-        border-radius: {RADIUS_SM};
+        border: 1px solid {c["border"]};
+        border-radius: {RADIUS_MD};
         background-color: {c["bg_primary"]};
         top: -1px;
     }}
@@ -315,77 +443,79 @@ def build_stylesheet(theme: str = "dark") -> str:
         qproperty-drawBase: 0;
     }}
     QTabBar::tab {{
-        background-color: {c["bg_tertiary"]};
+        background-color: transparent;
         color: {c["text_secondary"]};
-        padding: 10px 18px;
-        min-width: 140px;
-        border: 1px solid {c["border_subtle"]};
-        border-bottom: none;
-        border-top-left-radius: {RADIUS_MD};
-        border-top-right-radius: {RADIUS_MD};
+        padding: 10px 20px;
+        min-width: 138px;
+        border: none;
+        border-bottom: 3px solid transparent;
         margin-right: 2px;
         font-weight: 500;
     }}
     QTabBar::tab:selected {{
-        background-color: {c["accent"]};
-        color: {c["text_inverse"]};
+        color: {c["accent"]};
+        border-bottom: 3px solid {c["accent"]};
         font-weight: 600;
     }}
-    QTabBar::tab:!selected {{
-        margin-top: 2px;
-    }}
     QTabBar::tab:hover:!selected {{
-        background-color: {c["bg_hover"]};
         color: {c["text_primary"]};
+        background-color: {c["accent_subtle"]};
+        border-bottom: 3px solid {c["accent_subtle"]};
     }}
 
-    /* ── GroupBox ─────────────────────────────────────────────── */
+    /* ================================================================
+       GROUPBOX  (section containers)
+       ================================================================ */
     QGroupBox {{
         background-color: {c["bg_secondary"]};
-        border: 1px solid {c["border_subtle"]};
-        border-radius: {RADIUS_MD};
-        margin-top: 14px;
-        padding: 16px 12px 12px 12px;
+        border: 1px solid {c["border"]};
+        border-radius: {RADIUS_LG};
+        margin-top: 16px;
+        padding: 20px 14px 14px 14px;
         font-weight: 600;
     }}
     QGroupBox::title {{
         subcontrol-origin: margin;
         subcontrol-position: top left;
-        padding: 2px 12px;
+        padding: 2px 10px;
         color: {c["accent"]};
-        font-size: {FONT_SIZE};
-        font-weight: 600;
+        font-size: {FONT_SIZE_SMALL};
+        font-weight: 700;
+        letter-spacing: 0.5px;
     }}
 
-    /* ── Splitter ─────────────────────────────────────────────── */
+    /* ================================================================
+       SPLITTER
+       ================================================================ */
     QSplitter::handle {{
-        background-color: {c["border_subtle"]};
-        border-radius: 2px;
+        background-color: {c["border"]};
     }}
     QSplitter::handle:horizontal {{
-        width: 6px;
-        margin: 6px 0px;
+        width: 1px;
+        margin: 0px;
     }}
     QSplitter::handle:vertical {{
-        height: 6px;
-        margin: 0px 6px;
+        height: 1px;
+        margin: 0px;
     }}
     QSplitter::handle:hover {{
         background-color: {c["accent"]};
     }}
 
-    /* ── ScrollBar ────────────────────────────────────────────── */
+    /* ================================================================
+       SCROLLBAR
+       ================================================================ */
     QScrollBar:vertical {{
         border: none;
         background-color: {c["scrollbar_bg"]};
-        width: 10px;
+        width: 8px;
         margin: 0px;
-        border-radius: 5px;
+        border-radius: 4px;
     }}
     QScrollBar::handle:vertical {{
         background-color: {c["scrollbar_handle"]};
         min-height: 30px;
-        border-radius: 5px;
+        border-radius: 4px;
     }}
     QScrollBar::handle:vertical:hover {{
         background-color: {c["scrollbar_hover"]};
@@ -393,14 +523,14 @@ def build_stylesheet(theme: str = "dark") -> str:
     QScrollBar:horizontal {{
         border: none;
         background-color: {c["scrollbar_bg"]};
-        height: 10px;
+        height: 8px;
         margin: 0px;
-        border-radius: 5px;
+        border-radius: 4px;
     }}
     QScrollBar::handle:horizontal {{
         background-color: {c["scrollbar_handle"]};
         min-width: 30px;
-        border-radius: 5px;
+        border-radius: 4px;
     }}
     QScrollBar::handle:horizontal:hover {{
         background-color: {c["scrollbar_hover"]};
@@ -415,72 +545,149 @@ def build_stylesheet(theme: str = "dark") -> str:
         background: none;
     }}
 
-    /* ── ScrollArea ───────────────────────────────────────────── */
+    /* ================================================================
+       SCROLLAREA
+       ================================================================ */
     QScrollArea {{
         border: none;
         background-color: transparent;
     }}
 
-    /* ── ToolTip ──────────────────────────────────────────────── */
+    /* ================================================================
+       TOOLTIP
+       ================================================================ */
     QToolTip {{
         background-color: {c["bg_tertiary"]};
         color: {c["text_primary"]};
         border: 1px solid {c["border"]};
         padding: 6px 10px;
-        border-radius: {RADIUS_SM};
+        border-radius: {RADIUS_MD};
         font-size: {FONT_SIZE_SMALL};
     }}
 
-    /* ── Label ────────────────────────────────────────────────── */
+    /* ================================================================
+       LABEL
+       ================================================================ */
     QLabel {{
         color: {c["text_primary"]};
         background-color: transparent;
     }}
 
-    /* ── Menu ─────────────────────────────────────────────────── */
+    /* ================================================================
+       MENU
+       ================================================================ */
     QMenuBar {{
         background-color: {c["bg_secondary"]};
         color: {c["text_primary"]};
-        border-bottom: 1px solid {c["border_subtle"]};
+        border-bottom: 1px solid {c["border"]};
+        padding: 2px;
     }}
     QMenuBar::item:selected {{
         background-color: {c["accent"]};
         color: {c["text_inverse"]};
+        border-radius: {RADIUS_SM};
     }}
     QMenu {{
         background-color: {c["bg_secondary"]};
         color: {c["text_primary"]};
         border: 1px solid {c["border"]};
         padding: 4px;
+        border-radius: {RADIUS_MD};
+    }}
+    QMenu::item {{
+        padding: 6px 24px 6px 12px;
+        border-radius: {RADIUS_SM};
     }}
     QMenu::item:selected {{
         background-color: {c["accent"]};
         color: {c["text_inverse"]};
-        border-radius: {RADIUS_SM};
+    }}
+    QMenu::separator {{
+        height: 1px;
+        background-color: {c["border"]};
+        margin: 4px 8px;
     }}
 
-    /* ── ProgressBar ──────────────────────────────────────────── */
+    /* ================================================================
+       PROGRESSBAR
+       ================================================================ */
     QProgressBar {{
         border: none;
         background-color: {c["bg_tertiary"]};
         border-radius: {RADIUS_SM};
         text-align: center;
         color: {c["text_primary"]};
-        height: 8px;
+        height: 6px;
     }}
     QProgressBar::chunk {{
         background-color: {c["accent"]};
         border-radius: {RADIUS_SM};
     }}
 
-    /* ── Frame ────────────────────────────────────────────────── */
+    /* ================================================================
+       FRAME  (horizontal / vertical lines)
+       ================================================================ */
     QFrame[frameShape="4"] {{
-        color: {c["border_subtle"]};
+        color: {c["border"]};
         max-height: 1px;
     }}
     QFrame[frameShape="5"] {{
-        color: {c["border_subtle"]};
+        color: {c["border"]};
         max-width: 1px;
+    }}
+
+    /* ================================================================
+       SLIDER
+       ================================================================ */
+    QSlider::groove:horizontal {{
+        border: none;
+        height: 4px;
+        background: {c["bg_tertiary"]};
+        border-radius: 2px;
+    }}
+    QSlider::handle:horizontal {{
+        background: {c["accent"]};
+        border: none;
+        width: 16px;
+        height: 16px;
+        margin: -6px 0;
+        border-radius: 8px;
+    }}
+    QSlider::handle:horizontal:hover {{
+        background: {c["accent_hover"]};
+    }}
+    QSlider::sub-page:horizontal {{
+        background: {c["accent"]};
+        border-radius: 2px;
+    }}
+
+    /* ================================================================
+       LISTWIDGET
+       ================================================================ */
+    QListWidget {{
+        background-color: {c["bg_secondary"]};
+        border: 1px solid {c["border"]};
+        border-radius: {RADIUS_MD};
+        outline: none;
+    }}
+    QListWidget::item {{
+        padding: 6px 10px;
+        border-bottom: 1px solid {c["border_subtle"]};
+    }}
+    QListWidget::item:selected {{
+        background-color: {c["accent"]};
+        color: {c["text_inverse"]};
+        border-radius: {RADIUS_SM};
+    }}
+    QListWidget::item:hover:!selected {{
+        background-color: {c["bg_hover"]};
+    }}
+
+    /* ================================================================
+       STACKED WIDGET
+       ================================================================ */
+    QStackedWidget {{
+        background-color: {c["bg_primary"]};
     }}
     """
 

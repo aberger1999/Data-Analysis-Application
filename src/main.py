@@ -1,5 +1,5 @@
 """
-Main entry point for the Data Analysis Application.
+Main entry point for the DataLens application.
 This module initializes the PyQt5 application and launches the main window.
 Cross-platform support for Windows and macOS.
 """
@@ -54,7 +54,7 @@ def main():
     os.environ['QT_QPA_PLATFORM_PLUGIN_PATH'] = plugins_path
 
     app = QApplication(sys.argv)
-    app.setApplicationName("Data Analysis Application")
+    app.setApplicationName("DataLens")
     app.setOrganizationName("DataAnalysis")
     app.setOrganizationDomain("dataanalysis.app")
 

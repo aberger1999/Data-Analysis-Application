@@ -5,11 +5,11 @@ Workspace view containing all data analysis tools.
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QFrame, QSplitter, QTabWidget, QFileDialog,
-    QMessageBox
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont
 import os
+from . import modal
 from .data_preview import DataPreviewPanel
 from .analysis_panel import AnalysisPanel
 from .visualization_panel import VisualizationPanel
@@ -19,7 +19,7 @@ from .machine_learning_panel import MachineLearningPanel
 from .report_generator_panel import ReportGeneratorPanel
 from .dataset_manager_panel import DatasetManagerDialog
 from ..data_manager import DataManager
-from ..theme import get_colors, RADIUS_MD
+from ..theme import get_colors, RADIUS_MD, RADIUS_LG
 
 class WorkspaceView(QWidget):
     """View for working within a specific workspace."""
@@ -43,27 +43,11 @@ class WorkspaceView(QWidget):
     def update_theme(self, theme_name):
         c = get_colors(theme_name)
 
-        # Header
+        # Header bar
         self.header_frame.setStyleSheet(f"""
-            QFrame {{
+            QFrame#headerFrame {{
                 background-color: {c['bg_secondary']};
-                border-bottom: 2px solid {c['accent']};
-            }}
-        """)
-
-        # Back button
-        self.back_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {c['bg_tertiary']};
-                color: {c['text_primary']};
-                border: 1px solid {c['border']};
-                border-radius: {RADIUS_MD};
-                padding: 8px 16px;
-                font-size: 10pt;
-            }}
-            QPushButton:hover {{
-                background-color: {c['bg_hover']};
-                border-color: {c['accent']};
+                border-bottom: 1px solid {c['border']};
             }}
         """)
 
@@ -78,42 +62,49 @@ class WorkspaceView(QWidget):
         layout.setSpacing(0)
 
         self.header_frame = QFrame()
+        self.header_frame.setObjectName("headerFrame")
         header_layout = QHBoxLayout(self.header_frame)
-        header_layout.setContentsMargins(20, 15, 20, 15)
+        header_layout.setContentsMargins(16, 10, 16, 10)
+        header_layout.setSpacing(10)
 
-        self.back_btn = QPushButton("← Back to Home")
+        self.back_btn = QPushButton("← Back")
+        self.back_btn.setProperty("cssClass", "ghost")
         self.back_btn.clicked.connect(self.on_back_clicked)
         header_layout.addWidget(self.back_btn)
 
-        header_layout.addSpacing(20)
+        # Vertical separator
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.VLine)
+        header_layout.addWidget(sep)
 
         self.workspace_label = QLabel()
         workspace_font = QFont()
-        workspace_font.setPointSize(14)
+        workspace_font.setPointSize(12)
         workspace_font.setBold(True)
         self.workspace_label.setFont(workspace_font)
         header_layout.addWidget(self.workspace_label)
 
         header_layout.addStretch()
 
+        # Action button group
         self.dataset_manager_btn = QPushButton("Dataset Manager")
-        self.dataset_manager_btn.setProperty("cssClass", "primary")
+        self.dataset_manager_btn.setProperty("cssClass", "outline")
         self.dataset_manager_btn.clicked.connect(self.show_dataset_manager)
         header_layout.addWidget(self.dataset_manager_btn)
 
         self.load_btn = QPushButton("Import CSV")
-        self.load_btn.setProperty("cssClass", "primary")
+        self.load_btn.setProperty("cssClass", "outline")
         self.load_btn.clicked.connect(self.load_data)
         header_layout.addWidget(self.load_btn)
 
         self.save_btn = QPushButton("Save Workspace")
-        self.save_btn.setProperty("cssClass", "success")
+        self.save_btn.setProperty("cssClass", "primary")
         self.save_btn.setEnabled(False)
         self.save_btn.clicked.connect(self.save_workspace)
         header_layout.addWidget(self.save_btn)
 
         self.export_btn = QPushButton("Export CSV")
-        self.export_btn.setProperty("cssClass", "danger")
+        self.export_btn.setProperty("cssClass", "primary")
         self.export_btn.setEnabled(False)
         self.export_btn.clicked.connect(self.save_data)
         header_layout.addWidget(self.export_btn)
@@ -121,7 +112,7 @@ class WorkspaceView(QWidget):
         layout.addWidget(self.header_frame)
 
         content_layout = QVBoxLayout()
-        content_layout.setContentsMargins(10, 10, 10, 10)
+        content_layout.setContentsMargins(8, 8, 8, 8)
 
         main_splitter = QSplitter(Qt.Orientation.Horizontal)
         main_splitter.setChildrenCollapsible(False)
@@ -244,13 +235,13 @@ class WorkspaceView(QWidget):
                 elif file_path.endswith('.xlsx'):
                     self.data_manager.data.to_excel(file_path, index=False)
                     
-                QMessageBox.information(
+                modal.show_info(
                     self,
                     "Success",
                     f"Data saved successfully to {file_path}"
                 )
             except Exception as e:
-                QMessageBox.critical(
+                modal.show_error(
                     self,
                     "Error",
                     f"Error saving data: {str(e)}"
@@ -259,16 +250,15 @@ class WorkspaceView(QWidget):
     def load_dataset_from_manager(self, file_path):
         """Load a dataset selected from the dataset manager."""
         if self.has_unsaved_changes:
-            reply = QMessageBox.question(
+            result = modal.show_question_3way(
                 self,
                 "Unsaved Changes",
-                "You have unsaved changes. Do you want to save before loading a new dataset?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel
+                "You have unsaved changes. Do you want to save before loading a new dataset?"
             )
 
-            if reply == QMessageBox.StandardButton.Cancel:
+            if result == "cancel":
                 return
-            elif reply == QMessageBox.StandardButton.Yes:
+            elif result == "yes":
                 self.save_workspace()
 
         self.data_manager.load_csv(file_path)
@@ -314,24 +304,14 @@ class WorkspaceView(QWidget):
 
         if self.has_unsaved_changes and has_data:
             self.save_btn.setText("Save Workspace *")
-            c = get_colors("dark")  # warning color is same across themes
-            self.save_btn.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: {c['warning']};
-                    color: #ffffff;
-                    border: none;
-                    border-radius: {RADIUS_MD};
-                    padding: 8px 16px;
-                    font-weight: 600;
-                }}
-                QPushButton:hover {{
-                    background-color: #d97706;
-                }}
-            """)
+            self.save_btn.setProperty("cssClass", "warning")
+            self.save_btn.setStyleSheet("")  # clear any overrides
+            self.save_btn.style().unpolish(self.save_btn)
+            self.save_btn.style().polish(self.save_btn)
         else:
             self.save_btn.setText("Save Workspace")
+            self.save_btn.setProperty("cssClass", "primary")
             self.save_btn.setStyleSheet("")
-            self.save_btn.setProperty("cssClass", "success")
             self.save_btn.style().unpolish(self.save_btn)
             self.save_btn.style().polish(self.save_btn)
 
@@ -348,13 +328,13 @@ class WorkspaceView(QWidget):
             if self.dataset_manager_dialog:
                 self.dataset_manager_dialog.set_current_dataset("workspace_data.csv")
 
-            QMessageBox.information(
+            modal.show_info(
                 self,
                 "Success",
                 "Workspace data saved successfully!"
             )
         except Exception as e:
-            QMessageBox.critical(
+            modal.show_error(
                 self,
                 "Error",
                 f"Error saving workspace: {str(e)}"
@@ -363,16 +343,15 @@ class WorkspaceView(QWidget):
     def on_back_clicked(self):
         """Handle back button click with unsaved changes check."""
         if self.has_unsaved_changes:
-            reply = QMessageBox.question(
+            result = modal.show_question_3way(
                 self,
                 "Unsaved Changes",
-                "You have unsaved changes. Do you want to save before leaving?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel
+                "You have unsaved changes. Do you want to save before leaving?"
             )
 
-            if reply == QMessageBox.StandardButton.Cancel:
+            if result == "cancel":
                 return
-            elif reply == QMessageBox.StandardButton.Yes:
+            elif result == "yes":
                 self.save_workspace()
 
         self.back_to_home.emit()
@@ -419,4 +398,4 @@ class WorkspaceView(QWidget):
 
     def show_error(self, message):
         """Show error message."""
-        QMessageBox.critical(self, "Error", message)
+        modal.show_error(self, "Error", message)

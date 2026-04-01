@@ -10,6 +10,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QKeySequence
+from . import modal
 import pandas as pd
 
 class DataPreviewPanel(QWidget):
@@ -65,7 +66,9 @@ class DataPreviewPanel(QWidget):
         # Filter buttons
         button_layout = QHBoxLayout()
         self.apply_filter_btn = QPushButton("Apply Filter")
+        self.apply_filter_btn.setProperty("cssClass", "primary")
         self.clear_filter_btn = QPushButton("Clear Filter")
+        self.clear_filter_btn.setProperty("cssClass", "outline")
         button_layout.addWidget(self.apply_filter_btn)
         button_layout.addWidget(self.clear_filter_btn)
         filter_layout.addLayout(button_layout, 1, 0, 1, 6)
@@ -209,8 +212,7 @@ class DataPreviewPanel(QWidget):
             self.update_table_view()
             
         except Exception as e:
-            from PyQt5.QtWidgets import QMessageBox
-            QMessageBox.warning(self, "Filter Error", f"Error applying filter: {str(e)}")
+            modal.show_warning(self, "Filter Error", f"Error applying filter: {str(e)}")
         
     def clear_filter(self):
         """Clear the current filter."""
@@ -328,8 +330,7 @@ class DataPreviewPanel(QWidget):
             self.data_manager.data_loaded.emit(self.data_manager._data)
             
         except Exception as e:
-            from PyQt5.QtWidgets import QMessageBox
-            QMessageBox.warning(self, "Edit Error", f"Error updating cell value: {str(e)}")
+            modal.show_warning(self, "Edit Error", f"Error updating cell value: {str(e)}")
             # Revert to the original value
             self.update_current_page()
     

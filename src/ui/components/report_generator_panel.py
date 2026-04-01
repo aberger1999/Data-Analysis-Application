@@ -6,10 +6,11 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
     QLabel, QComboBox, QPushButton, QSpinBox,
     QGridLayout, QTabWidget, QLineEdit, QCheckBox,
-    QTableWidget, QTableWidgetItem, QMessageBox,
+    QTableWidget, QTableWidgetItem,
     QTextEdit, QFileDialog
 )
 from PyQt5.QtCore import Qt
+from . import modal
 import pandas as pd
 import numpy as np
 from datetime import datetime
@@ -128,8 +129,11 @@ class ReportGeneratorPanel(QWidget):
         button_layout = QHBoxLayout()
         
         self.preview_btn = QPushButton("Generate Preview")
+        self.preview_btn.setProperty("cssClass", "primary")
         self.export_pdf_btn = QPushButton("Export as PDF")
+        self.export_pdf_btn.setProperty("cssClass", "primary")
         self.export_html_btn = QPushButton("Export as HTML")
+        self.export_html_btn.setProperty("cssClass", "primary")
         
         button_layout.addWidget(self.preview_btn)
         button_layout.addWidget(self.export_pdf_btn)
@@ -274,7 +278,7 @@ class ReportGeneratorPanel(QWidget):
     def generate_preview(self):
         """Generate report preview."""
         if self.data_manager.data is None:
-            QMessageBox.warning(self, "Warning", "No data loaded.")
+            modal.show_warning(self, "Warning", "No data loaded.")
             return
 
         self.cleanup_temp_files()
@@ -316,7 +320,7 @@ class ReportGeneratorPanel(QWidget):
             self.preview_edit.setHtml(html_content)
             
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error generating preview: {str(e)}")
+            modal.show_error(self, "Error", f"Error generating preview: {str(e)}")
             
     def export_pdf(self):
         """Export report as PDF."""
@@ -334,7 +338,7 @@ class ReportGeneratorPanel(QWidget):
 
             if file_path:
                 if not WEASYPRINT_AVAILABLE:
-                    QMessageBox.warning(
+                    modal.show_warning(
                         self,
                         "Feature Not Available",
                         "PDF export requires WeasyPrint which is not available on this system.\n\n"
@@ -357,14 +361,14 @@ class ReportGeneratorPanel(QWidget):
 
                 os.remove(temp_html)
 
-                QMessageBox.information(
+                modal.show_info(
                     self,
                     "Success",
                     f"Report exported successfully to {file_path}"
                 )
 
         except Exception as e:
-            QMessageBox.critical(
+            modal.show_error(
                 self,
                 "Error",
                 f"Error exporting PDF: {str(e)}"
@@ -391,14 +395,14 @@ class ReportGeneratorPanel(QWidget):
                 with open(file_path, 'w', encoding='utf-8') as f:
                     f.write(self.preview_edit.toHtml())
 
-                QMessageBox.information(
+                modal.show_info(
                     self,
                     "Success",
                     f"Report exported successfully to {file_path}"
                 )
 
         except Exception as e:
-            QMessageBox.critical(
+            modal.show_error(
                 self,
                 "Error",
                 f"Error exporting HTML: {str(e)}"

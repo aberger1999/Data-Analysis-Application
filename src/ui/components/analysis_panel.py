@@ -5,11 +5,12 @@ Analysis panel for data analysis operations.
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFrame,
     QLabel, QComboBox, QPushButton, QTableWidget,
-    QTableWidgetItem, QStackedWidget, QMessageBox,
+    QTableWidgetItem, QStackedWidget,
     QGridLayout, QSplitter, QSizePolicy, QStyledItemDelegate
 )
 from PyQt5.QtCore import Qt, QRect
 from PyQt5.QtGui import QColor, QFont, QPainter, QBrush
+from . import modal
 import pandas as pd
 import numpy as np
 import matplotlib
@@ -63,7 +64,7 @@ class AnalysisPanel(QWidget):
 
         # Add run button
         self.run_btn = QPushButton("Run Analysis")
-        self.run_btn.setStyleSheet("background-color: #2196F3; color: white; border: none;")
+        self.run_btn.setProperty("cssClass", "primary")
         control_layout.addWidget(self.run_btn)
 
         main_layout.addWidget(control_panel)
@@ -168,7 +169,7 @@ class AnalysisPanel(QWidget):
         numeric_df = df.select_dtypes(include=[np.number])
 
         if numeric_df.empty:
-            QMessageBox.warning(self, "Warning", "No numeric columns found for correlation matrix.")
+            modal.show_warning(self, "Warning", "No numeric columns found for correlation matrix.")
             return
 
         self.corr_figure.clear()
@@ -264,41 +265,14 @@ class AnalysisPanel(QWidget):
             self.figure.tight_layout()
             self.canvas.draw()
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error creating visualization: {str(e)}")
+            modal.show_error(self, "Error", f"Error creating visualization: {str(e)}")
             
     def update_theme(self, theme_name):
-        """Update the panel theme."""
+        """Update the panel theme — mostly handled by global stylesheet now."""
         from ..theme import get_colors
         c = get_colors(theme_name)
-
-        self.analysis_stack.setStyleSheet(f"background-color: {c['bg_primary']};")
-
-        btn_style = f"""
-            QPushButton {{ background-color: {c['bg_tertiary']}; color: {c['text_primary']}; border: 1px solid {c['border']}; }}
-            QPushButton:checked {{ background-color: {c['accent']}; color: {c['text_inverse']}; }}
-        """
-
-        self.stats_btn.setStyleSheet(btn_style)
-        self.viz_btn.setStyleSheet(btn_style)
-        self.corr_btn.setStyleSheet(btn_style)
-
-        self.results_table.setStyleSheet(f"""
-            QTableWidget {{
-                background-color: {c['bg_secondary']};
-                color: {c['text_primary']};
-                gridline-color: {c['table_grid']};
-                selection-background-color: {c['accent']};
-                selection-color: {c['text_inverse']};
-            }}
-            QHeaderView::section {{
-                background-color: {c['bg_tertiary']};
-                color: {c['text_primary']};
-                border: 1px solid {c['border_subtle']};
-                padding: 4px;
-            }}
-        """)
-
         bg_color = c['bg_primary']
+
         if hasattr(self, 'figure'):
             self.figure.patch.set_facecolor(bg_color)
             if hasattr(self, 'canvas'):
@@ -465,4 +439,4 @@ class AnalysisPanel(QWidget):
             self.results_table.setMinimumHeight(self.stats_frame.height() - 20)
             
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error calculating statistics: {str(e)}") 
+            modal.show_error(self, "Error", f"Error calculating statistics: {str(e)}") 

@@ -7,9 +7,10 @@ import shutil
 from datetime import datetime
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
-    QListWidget, QListWidgetItem, QMessageBox, QFileDialog,
+    QListWidget, QListWidgetItem, QFileDialog,
     QInputDialog, QLabel, QMenu, QWidget
 )
+from . import modal
 from PyQt5.QtCore import Qt, pyqtSignal, QSize
 from PyQt5.QtGui import QIcon, QFont, QColor
 from ..theme import get_colors, RADIUS_MD, RADIUS_LG
@@ -43,11 +44,14 @@ class DatasetItem(QWidget):
         info_layout.setContentsMargins(0, 0, 0, 0)
 
         name_label = QLabel(name_without_ext)
-        name_label.setStyleSheet(f"font-weight: bold; font-size: 12pt; color: {c['text_primary']}; background: transparent;")
+        name_font = QFont()
+        name_font.setPointSize(11)
+        name_font.setBold(True)
+        name_label.setFont(name_font)
         name_label.setWordWrap(False)
 
         details_label = QLabel(f"{size_str}  ·  {time_str}")
-        details_label.setStyleSheet(f"color: {c['text_secondary']}; font-size: 9pt; background: transparent;")
+        details_label.setStyleSheet(f"color: {c['text_secondary']}; font-size: 9pt;")
 
         info_layout.addWidget(name_label)
         info_layout.addWidget(details_label)
@@ -56,20 +60,7 @@ class DatasetItem(QWidget):
 
         self.menu_btn = QPushButton("⋮")
         self.menu_btn.setFixedSize(36, 36)
-        self.menu_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: transparent;
-                border: none;
-                font-size: 16pt;
-                font-weight: bold;
-                color: {c['text_secondary']};
-            }}
-            QPushButton:hover {{
-                background-color: {c['bg_hover']};
-                border-radius: 6px;
-                color: {c['text_primary']};
-            }}
-        """)
+        self.menu_btn.setProperty("cssClass", "ghost")
         layout.addWidget(self.menu_btn, 0, Qt.AlignmentFlag.AlignVCenter)
 
     def format_size(self, size):
@@ -115,36 +106,14 @@ class DatasetManagerDialog(QDialog):
         layout.setContentsMargins(24, 24, 24, 24)
 
         header = QLabel("Dataset Manager")
-        header.setStyleSheet(f"font-size: 16pt; font-weight: bold; color: {c['text_primary']};")
+        header_font = QFont()
+        header_font.setPointSize(14)
+        header_font.setBold(True)
+        header.setFont(header_font)
         layout.addWidget(header)
 
         self.dataset_list = QListWidget()
         self.dataset_list.setSpacing(4)
-        self.dataset_list.setStyleSheet(f"""
-            QListWidget {{
-                background-color: {c['bg_secondary']};
-                border: 1px solid {c['border_subtle']};
-                border-radius: {RADIUS_MD};
-                padding: 6px;
-                outline: none;
-            }}
-            QListWidget::item {{
-                background-color: {c['bg_secondary']};
-                border: 1px solid {c['border_subtle']};
-                border-radius: 6px;
-                padding: 0px;
-                margin: 3px;
-                min-height: 88px;
-            }}
-            QListWidget::item:hover {{
-                background-color: {c['bg_hover']};
-                border: 1px solid {c['border']};
-            }}
-            QListWidget::item:selected {{
-                background-color: {c['accent_subtle']};
-                border: 2px solid {c['accent']};
-            }}
-        """)
         self.dataset_list.itemDoubleClicked.connect(self.load_selected_dataset)
         layout.addWidget(self.dataset_list)
 
@@ -156,20 +125,8 @@ class DatasetManagerDialog(QDialog):
         self.import_btn.clicked.connect(self.import_dataset)
 
         self.load_btn = QPushButton("Load Selected")
+        self.load_btn.setProperty("cssClass", "success")
         self.load_btn.clicked.connect(self.load_selected_dataset)
-        self.load_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {c['success']};
-                color: {c['text_inverse']};
-                border: none;
-                border-radius: {RADIUS_MD};
-                padding: 10px 24px;
-                font-weight: 600;
-            }}
-            QPushButton:hover {{
-                background-color: #059669;
-            }}
-        """)
 
         self.close_btn = QPushButton("Close")
         self.close_btn.clicked.connect(self.accept)
@@ -224,26 +181,7 @@ class DatasetManagerDialog(QDialog):
 
     def show_context_menu(self, filename):
         """Show context menu for dataset actions."""
-        c = get_colors(self._get_theme())
         menu = QMenu(self)
-        menu.setStyleSheet(f"""
-            QMenu {{
-                background-color: {c['bg_secondary']};
-                border: 1px solid {c['border']};
-                border-radius: 6px;
-                padding: 4px;
-            }}
-            QMenu::item {{
-                padding: 8px 24px;
-                color: {c['text_primary']};
-                font-size: 10pt;
-                border-radius: 4px;
-            }}
-            QMenu::item:selected {{
-                background-color: {c['accent']};
-                color: {c['text_inverse']};
-            }}
-        """)
 
         rename_action = menu.addAction("✏️ Rename")
         delete_action = menu.addAction("🗑️ Delete")
@@ -275,26 +213,24 @@ class DatasetManagerDialog(QDialog):
             dest_path = os.path.join(self.workspace_path, "data", filename)
 
             if os.path.exists(dest_path):
-                reply = QMessageBox.question(
+                if not modal.show_question(
                     self,
                     "File Exists",
-                    f"A dataset named '{filename}' already exists. Overwrite?",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-                )
-                if reply == QMessageBox.StandardButton.No:
+                    f"A dataset named '{filename}' already exists. Overwrite?"
+                ):
                     return
 
             shutil.copy2(file_path, dest_path)
             self.refresh_dataset_list()
 
-            QMessageBox.information(
+            modal.show_info(
                 self,
                 "Success",
                 f"Dataset '{filename}' imported successfully!"
             )
 
         except Exception as e:
-            QMessageBox.critical(
+            modal.show_error(
                 self,
                 "Error",
                 f"Error importing dataset: {str(e)}"
@@ -317,7 +253,7 @@ class DatasetManagerDialog(QDialog):
     def rename_dataset(self, filename):
         """Rename a dataset."""
         if filename == "workspace_data.csv":
-            QMessageBox.warning(
+            modal.show_warning(
                 self,
                 "Cannot Rename",
                 "The active workspace data file cannot be renamed."
@@ -343,7 +279,7 @@ class DatasetManagerDialog(QDialog):
             new_path = os.path.join(self.workspace_path, "data", new_name)
 
             if os.path.exists(new_path):
-                QMessageBox.warning(
+                modal.show_warning(
                     self,
                     "Error",
                     f"A dataset named '{new_name}' already exists."
@@ -355,7 +291,7 @@ class DatasetManagerDialog(QDialog):
             self.refresh_dataset_list()
 
         except Exception as e:
-            QMessageBox.critical(
+            modal.show_error(
                 self,
                 "Error",
                 f"Error renaming dataset: {str(e)}"
@@ -363,14 +299,11 @@ class DatasetManagerDialog(QDialog):
 
     def delete_dataset(self, filename):
         """Delete a dataset."""
-        reply = QMessageBox.question(
+        if not modal.show_question(
             self,
             "Confirm Delete",
-            f"Are you sure you want to delete '{filename}'?\nThis action cannot be undone.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-
-        if reply == QMessageBox.StandardButton.No:
+            f"Are you sure you want to delete '{filename}'?\nThis action cannot be undone."
+        ):
             return
 
         try:
@@ -379,14 +312,14 @@ class DatasetManagerDialog(QDialog):
             self.dataset_deleted.emit(filename)
             self.refresh_dataset_list()
 
-            QMessageBox.information(
+            modal.show_info(
                 self,
                 "Success",
                 f"Dataset '{filename}' deleted successfully!"
             )
 
         except Exception as e:
-            QMessageBox.critical(
+            modal.show_error(
                 self,
                 "Error",
                 f"Error deleting dataset: {str(e)}"

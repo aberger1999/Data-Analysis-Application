@@ -8,10 +8,10 @@ from PyQt5.QtWidgets import (
     QGridLayout, QSpinBox, QDoubleSpinBox, QColorDialog, QCheckBox,
     QFileDialog, QListWidget, QToolButton, QSlider,
     QSizePolicy, QGroupBox, QTabWidget, QSplitter,
-    QLineEdit
+    QLineEdit, QDialog, QApplication
 )
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QColor
+from PyQt5.QtGui import QColor, QPixmap, QPainter, QIcon
 import matplotlib
 matplotlib.use('Qt5Agg')  # Set the backend before importing pyplot
 import matplotlib.pyplot as plt
@@ -23,6 +23,111 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 import os
+
+
+class _StyledSplitterHandle(QWidget):
+    """Custom painted grip for the horizontal splitter handle."""
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+        # Draw three small centered dots as a grip indicator
+        dot_r = 2
+        gap = 10
+        cx = w // 2
+        cy = h // 2
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor("#4b5563"))
+        for dx in (-gap, 0, gap):
+            p.drawEllipse(cx + dx - dot_r, cy - dot_r, dot_r * 2, dot_r * 2)
+        p.end()
+
+
+class FullScreenChartDialog(QDialog):
+    """Full-screen overlay for viewing the chart at large size."""
+
+    def __init__(self, source_figure, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Chart — Full View")
+        self.setModal(True)
+
+        # Remove window frame, go full-screen overlay
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+
+        screen = QApplication.primaryScreen().geometry()
+        self.setGeometry(screen)
+
+        # Outer layout (dark backdrop)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+
+        # Backdrop frame
+        backdrop = QFrame()
+        backdrop.setStyleSheet("background-color: rgba(0,0,0,0.88); border-radius: 0px;")
+        outer.addWidget(backdrop)
+
+        blay = QVBoxLayout(backdrop)
+        blay.setContentsMargins(32, 16, 32, 32)
+
+        # Top bar with close button
+        top_bar = QHBoxLayout()
+        top_bar.addStretch()
+        close_btn = QPushButton("✕")
+        close_btn.setFixedSize(36, 36)
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(255,255,255,0.10);
+                color: #e2e4ed;
+                border: none;
+                border-radius: 18px;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: rgba(239,68,68,0.7);
+                color: #ffffff;
+            }
+        """)
+        close_btn.clicked.connect(self.close)
+        top_bar.addWidget(close_btn)
+        blay.addLayout(top_bar)
+
+        # Re-render chart into a new large figure
+        self.figure = Figure(dpi=100)
+        self.canvas = FigureCanvas(self.figure)
+        self.canvas.setStyleSheet("background-color: transparent;")
+        blay.addWidget(self.canvas, stretch=1)
+
+        # Copy the axes content from the source figure
+        self._copy_figure(source_figure)
+
+    def _copy_figure(self, source_figure):
+        """Render the source figure's content into this dialog's figure by
+        saving to a temporary image buffer and displaying it."""
+        import io
+        buf = io.BytesIO()
+        source_figure.savefig(buf, format='png', dpi=150, bbox_inches='tight',
+                              facecolor=source_figure.get_facecolor(),
+                              edgecolor='none')
+        buf.seek(0)
+        from matplotlib.image import imread
+        img = imread(buf)
+        buf.close()
+
+        ax = self.figure.add_subplot(111)
+        ax.imshow(img)
+        ax.axis('off')
+        self.figure.patch.set_facecolor('none')
+        self.figure.subplots_adjust(left=0, right=1, top=1, bottom=0)
+        self.canvas.draw()
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Escape:
+            self.close()
+        super().keyPressEvent(event)
 
 class VisualizationPanel(QWidget):
     """Panel for creating and customizing visualizations."""
@@ -60,13 +165,33 @@ class VisualizationPanel(QWidget):
     def init_ui(self):
         """Initialize the user interface."""
         main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
 
         # Create a vertical splitter to allow resizing
-        splitter = QSplitter(Qt.Orientation.Vertical)
-        splitter.setChildrenCollapsible(False)
+        self.splitter = QSplitter(Qt.Orientation.Vertical)
+        self.splitter.setChildrenCollapsible(False)
+        self.splitter.setHandleWidth(8)
+        self.splitter.setStyleSheet("""
+            QSplitter::handle:vertical {
+                background-color: #1a1f2e;
+                border-top: 1px solid rgba(255,255,255,0.06);
+                border-bottom: 1px solid rgba(255,255,255,0.06);
+                min-height: 8px;
+                max-height: 8px;
+            }
+            QSplitter::handle:vertical:hover {
+                background-color: #6366f1;
+            }
+        """)
 
-        # Controls container using tabs for better organization
+        # -- Controls panel inside a scroll area so it stays usable when small --
+        controls_scroll = QScrollArea()
+        controls_scroll.setWidgetResizable(True)
+        controls_scroll.setMinimumHeight(36)          # can shrink almost all the way
+        controls_scroll.setFrameShape(QFrame.Shape.NoFrame)
+
         controls_container = QWidget()
+        controls_scroll.setWidget(controls_container)
         controls_tabs = QTabWidget(controls_container)
         controls_tabs.setTabPosition(QTabWidget.TabPosition.North)
 
@@ -365,8 +490,11 @@ class VisualizationPanel(QWidget):
         export_layout = QHBoxLayout(export_group)
 
         self.export_png_btn = QPushButton("Export PNG")
+        self.export_png_btn.setProperty("cssClass", "primary")
         self.export_pdf_btn = QPushButton("Export PDF")
+        self.export_pdf_btn.setProperty("cssClass", "primary")
         self.export_svg_btn = QPushButton("Export SVG")
+        self.export_svg_btn.setProperty("cssClass", "primary")
 
         export_layout.addWidget(self.export_png_btn)
         export_layout.addWidget(self.export_pdf_btn)
@@ -383,35 +511,104 @@ class VisualizationPanel(QWidget):
 
         # Preview area with matplotlib canvas
         preview_container = QWidget()
+        preview_container.setMinimumHeight(150)
         preview_layout = QVBoxLayout(preview_container)
         preview_layout.setContentsMargins(0, 0, 0, 0)
+        preview_layout.setSpacing(0)
 
-        # Add toolbar for interactive navigation
-        preview_layout.addWidget(self.toolbar)
+        # Toolbar row: matplotlib nav + expand button
+        toolbar_row = QHBoxLayout()
+        toolbar_row.setContentsMargins(4, 2, 4, 2)
+
+        # Style the matplotlib toolbar for dark theme
+        self.toolbar.setStyleSheet("""
+            QToolBar {
+                background: transparent;
+                border: none;
+                spacing: 2px;
+            }
+            QToolButton {
+                background-color: transparent;
+                border: 1px solid transparent;
+                border-radius: 4px;
+                padding: 4px;
+                min-width: 28px;
+                min-height: 28px;
+            }
+            QToolButton:hover {
+                background-color: rgba(99,102,241,0.18);
+                border-color: rgba(99,102,241,0.3);
+            }
+            QToolButton:checked, QToolButton:pressed {
+                background-color: rgba(99,102,241,0.25);
+                border-color: rgba(99,102,241,0.5);
+            }
+        """)
+        # Recolor toolbar icons for dark background
+        self._recolor_toolbar_icons()
+
+        toolbar_row.addWidget(self.toolbar, stretch=1)
+
+        # Expand / pop-out button
+        self.expand_btn = QPushButton("⤢")
+        self.expand_btn.setFixedSize(32, 32)
+        self.expand_btn.setToolTip("Expand to full view")
+        self.expand_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.expand_btn.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #cbd5e1;
+                border: 1px solid rgba(255,255,255,0.12);
+                border-radius: 4px;
+                font-size: 18px;
+                padding: 0px;
+                min-height: 0px;
+            }
+            QPushButton:hover {
+                background-color: rgba(99,102,241,0.22);
+                border-color: rgba(99,102,241,0.5);
+                color: #a5b4fc;
+            }
+        """)
+        self.expand_btn.clicked.connect(self._open_fullscreen_chart)
+        toolbar_row.addWidget(self.expand_btn)
+
+        preview_layout.addLayout(toolbar_row)
 
         # Create a frame for the canvas
         canvas_frame = QFrame()
-        canvas_frame.setFrameStyle(QFrame.Shape.StyledPanel)
+        canvas_frame.setFrameStyle(QFrame.Shape.NoFrame)
         canvas_frame.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         canvas_layout = QVBoxLayout(canvas_frame)
+        canvas_layout.setContentsMargins(0, 0, 0, 0)
         canvas_layout.addWidget(self.canvas)
 
         # Placeholder message
         self.placeholder = QLabel("Import data to create visualizations")
         self.placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.placeholder.setStyleSheet("color: #666; font-style: italic; padding: 20px;")
         canvas_layout.addWidget(self.placeholder)
 
-        preview_layout.addWidget(canvas_frame)
+        preview_layout.addWidget(canvas_frame, stretch=1)
 
         # Add widgets to splitter and set initial sizes
-        splitter.addWidget(controls_container)
-        splitter.addWidget(preview_container)
+        self.splitter.addWidget(controls_scroll)
+        self.splitter.addWidget(preview_container)
 
         # Set initial splitter sizes (30% controls, 70% chart)
-        splitter.setSizes([300, 700])
+        self.splitter.setSizes([300, 700])
 
-        main_layout.addWidget(splitter)
+        # Paint grip dots on the splitter handle
+        handle = self.splitter.handle(1)
+        if handle:
+            handle.setCursor(Qt.CursorShape.SplitVCursor)
+            handle_layout = QVBoxLayout(handle)
+            handle_layout.setContentsMargins(0, 0, 0, 0)
+            grip = _StyledSplitterHandle()
+            grip.setFixedHeight(8)
+            grip.setCursor(Qt.CursorShape.SplitVCursor)
+            handle_layout.addWidget(grip)
+
+        main_layout.addWidget(self.splitter)
 
     def setup_connections(self):
         """Setup signal connections."""
@@ -497,6 +694,41 @@ class VisualizationPanel(QWidget):
     def schedule_update(self):
         """Schedule a visualization update with a delay to prevent rapid updates."""
         self.update_timer.start(300)  # 300ms delay
+
+    # ── Toolbar icon recoloring ────────────────────────────────────────────
+
+    def _recolor_toolbar_icons(self):
+        """Recolor matplotlib NavigationToolbar icons so they are visible on
+        the dark background.  Each QToolButton icon is repainted with a light
+        tint (#cbd5e1)."""
+        target_color = QColor("#cbd5e1")
+        for action in self.toolbar.actions():
+            icon = action.icon()
+            if icon.isNull():
+                continue
+            # Grab the default pixmap and composite the target colour over it
+            sizes = icon.availableSizes()
+            sz = sizes[0] if sizes else None
+            if sz is None:
+                continue
+            pm = icon.pixmap(sz)
+            painted = QPixmap(pm.size())
+            painted.fill(Qt.GlobalColor.transparent)
+            p = QPainter(painted)
+            p.drawPixmap(0, 0, pm)
+            p.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+            p.fillRect(painted.rect(), target_color)
+            p.end()
+            action.setIcon(QIcon(painted))
+
+    # ── Full-screen pop-out ────────────────────────────────────────────────
+
+    def _open_fullscreen_chart(self):
+        """Open the current chart in a full-screen overlay dialog."""
+        if not self.figure.get_axes():
+            return  # nothing to show
+        dlg = FullScreenChartDialog(self.figure, parent=self.window())
+        dlg.exec_()
 
     def on_data_loaded(self, df):
         """Handle when new data is loaded."""

@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFrame,
     QLabel, QComboBox, QPushButton, QSpinBox,
     QGridLayout, QTabWidget, QLineEdit, QCheckBox,
-    QTableWidget, QTableWidgetItem, QMessageBox,
+    QTableWidget, QTableWidgetItem,
     QScrollArea, QGroupBox, QProgressDialog, QApplication,
     QMenu, QInputDialog, QShortcut
 )
@@ -17,6 +17,7 @@ import numpy as np
 from scipy import stats
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
 from copy import deepcopy
+from . import modal
 
 class PreprocessingPanel(QWidget):
     """Panel for data preprocessing operations."""
@@ -68,6 +69,7 @@ class PreprocessingPanel(QWidget):
         self.rename_btn = QPushButton("Rename")
         self.rename_btn.setEnabled(False)  # Disable initially until data is loaded
         self.remove_btn = QPushButton("Remove")
+        self.remove_btn.setProperty("cssClass", "danger")
         self.remove_btn.setEnabled(False)  # Disable initially until data is loaded
         column_layout.addWidget(self.rename_btn)
         column_layout.addWidget(self.remove_btn)
@@ -90,6 +92,7 @@ class PreprocessingPanel(QWidget):
         self.transform_combo.setEnabled(False)  # Disable initially until data is loaded
         transform_layout_group.addWidget(self.transform_combo)
         self.apply_transform_btn = QPushButton("Apply")
+        self.apply_transform_btn.setProperty("cssClass", "primary")
         self.apply_transform_btn.setEnabled(False)  # Disable initially until data is loaded
         transform_layout_group.addWidget(self.apply_transform_btn)
         ribbon.addWidget(transform_group)
@@ -111,6 +114,7 @@ class PreprocessingPanel(QWidget):
         filter_layout_group.addWidget(self.filter_condition)
         filter_layout_group.addWidget(self.filter_value)
         self.apply_filter_btn = QPushButton("Apply")
+        self.apply_filter_btn.setProperty("cssClass", "primary")
         filter_layout_group.addWidget(self.apply_filter_btn)
         ribbon.addWidget(filter_group)
         
@@ -137,6 +141,7 @@ class PreprocessingPanel(QWidget):
         options_layout.addWidget(self.exact_match_check)
         
         self.replace_btn = QPushButton("Replace")
+        self.replace_btn.setProperty("cssClass", "primary")
         self.replace_btn.setEnabled(False)  # Disable initially until data is loaded
         options_layout.addWidget(self.replace_btn)
         replace_layout_group.addLayout(options_layout)
@@ -163,6 +168,7 @@ class PreprocessingPanel(QWidget):
         self.rounding_digits.setEnabled(False)  # Disable initially until data is loaded
         
         self.apply_rounding_btn = QPushButton("Round")
+        self.apply_rounding_btn.setProperty("cssClass", "primary")
         self.apply_rounding_btn.setEnabled(False)  # Disable initially until data is loaded
         
         rounding_layout.addWidget(QLabel("Column:"))
@@ -188,6 +194,7 @@ class PreprocessingPanel(QWidget):
         self.split_delimiter.setEnabled(False)  # Disable initially until data is loaded
         
         self.apply_split_btn = QPushButton("Split")
+        self.apply_split_btn.setProperty("cssClass", "primary")
         self.apply_split_btn.setEnabled(False)  # Disable initially until data is loaded
         
         split_layout.addWidget(QLabel("Column:"))
@@ -211,6 +218,7 @@ class PreprocessingPanel(QWidget):
         self.unpivot_id_column.setEnabled(False)  # Disable initially until data is loaded
         
         self.apply_unpivot_btn = QPushButton("Unpivot")
+        self.apply_unpivot_btn.setProperty("cssClass", "primary")
         self.apply_unpivot_btn.setEnabled(False)  # Disable initially until data is loaded
         
         unpivot_layout.addWidget(QLabel("ID Column:"))
@@ -231,6 +239,7 @@ class PreprocessingPanel(QWidget):
         self.groupby_agg.setEnabled(False)  # Disable initially until data is loaded
         
         self.apply_groupby_btn = QPushButton("Group")
+        self.apply_groupby_btn.setProperty("cssClass", "primary")
         self.apply_groupby_btn.setEnabled(False)  # Disable initially until data is loaded
         
         groupby_layout.addWidget(QLabel("Column:"))
@@ -271,6 +280,7 @@ class PreprocessingPanel(QWidget):
         
         # Add Apply Changes button
         self.apply_changes_btn = QPushButton("Apply Changes to Main View")
+        self.apply_changes_btn.setProperty("cssClass", "success")
         self.apply_changes_btn.setEnabled(False)  # Disable initially until data is loaded
         pagination.addWidget(self.apply_changes_btn)
 
@@ -300,6 +310,7 @@ class PreprocessingPanel(QWidget):
         ])
 
         self.apply_missing_btn = QPushButton("Apply")
+        self.apply_missing_btn.setProperty("cssClass", "primary")
 
         missing_layout.addWidget(QLabel("Column:"))
         missing_layout.addWidget(self.missing_col_combo)
@@ -317,6 +328,7 @@ class PreprocessingPanel(QWidget):
         self.duplicates_action_combo.addItems(["Remove Duplicates", "Keep First", "Keep Last"])
 
         self.apply_duplicates_btn = QPushButton("Apply")
+        self.apply_duplicates_btn.setProperty("cssClass", "primary")
 
         duplicates_layout.addWidget(QLabel("Action:"))
         duplicates_layout.addWidget(self.duplicates_action_combo)
@@ -349,6 +361,7 @@ class PreprocessingPanel(QWidget):
 
         # Detect button
         self.detect_outliers_btn = QPushButton("Detect Outliers")
+        self.detect_outliers_btn.setProperty("cssClass", "primary")
         outlier_layout.addWidget(self.detect_outliers_btn, 3, 0, 1, 2)
 
         cleaning_layout.addWidget(outlier_group)
@@ -394,6 +407,7 @@ class PreprocessingPanel(QWidget):
         handling_layout.addWidget(self.handling_method_combo)
 
         self.apply_handling_btn = QPushButton("Apply")
+        self.apply_handling_btn.setProperty("cssClass", "primary")
         handling_layout.addWidget(self.apply_handling_btn)
 
         cleaning_layout.addWidget(handling_group)
@@ -470,7 +484,7 @@ class PreprocessingPanel(QWidget):
     def check_data_loaded(self):
         """Check if data is loaded and show error message if not."""
         if self.data_manager.data is None:
-            QMessageBox.warning(self, "No Data", 
+            modal.show_warning(self, "No Data", 
                               "Please load a dataset before performing operations.")
             return False
         return True
@@ -489,7 +503,7 @@ class PreprocessingPanel(QWidget):
             return header_item.text()
         except Exception as e:
             # Only show error message for unexpected exceptions
-            QMessageBox.critical(self, "Error", 
+            modal.show_error(self, "Error", 
                                f"Error getting column name: {str(e)}\n"
                                "Please make sure a valid column is selected.")
             return None
@@ -509,7 +523,7 @@ class PreprocessingPanel(QWidget):
         if column_name:
             self.rename_column_dialog(column_name)
         else:
-            QMessageBox.warning(self, "No Column Selected", 
+            modal.show_warning(self, "No Column Selected", 
                               "Please select a column before performing this operation.")
 
     def handle_remove_click(self):
@@ -527,7 +541,7 @@ class PreprocessingPanel(QWidget):
         if column_name:
             self.remove_column(column_name)
         else:
-            QMessageBox.warning(self, "No Column Selected", 
+            modal.show_warning(self, "No Column Selected", 
                               "Please select a column before performing this operation.")
 
     def handle_type_change(self, new_type):
@@ -591,7 +605,7 @@ class PreprocessingPanel(QWidget):
             
         column = self.get_selected_column()
         if column is None:
-            QMessageBox.warning(self, "No Column Selected", 
+            modal.show_warning(self, "No Column Selected", 
                               "Please select a column to transform.")
             return
             
@@ -657,11 +671,11 @@ class PreprocessingPanel(QWidget):
             self.update_data_view()
             
             progress.setValue(100)
-            QMessageBox.information(self, "Success", 
+            modal.show_info(self, "Success", 
                                   "Transformation applied successfully! Click 'Apply Changes to Main View' to update the main data preview.")
             
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error applying transformation: {str(e)}")
+            modal.show_error(self, "Error", f"Error applying transformation: {str(e)}")
         finally:
             progress.close()
 
@@ -675,7 +689,7 @@ class PreprocessingPanel(QWidget):
         value = self.filter_value.text()
         
         if not column or not value:
-            QMessageBox.warning(self, "Missing Information", 
+            modal.show_warning(self, "Missing Information", 
                               "Please select a column and enter a value.")
             return
             
@@ -708,21 +722,21 @@ class PreprocessingPanel(QWidget):
                 try:
                     df = df[df[column] > float(value)]
                 except ValueError:
-                    QMessageBox.warning(self, "Invalid Value", 
+                    modal.show_warning(self, "Invalid Value", 
                                       "Please enter a numeric value for 'greater than' comparison.")
                     return
             elif condition == "less than":
                 try:
                     df = df[df[column] < float(value)]
                 except ValueError:
-                    QMessageBox.warning(self, "Invalid Value", 
+                    modal.show_warning(self, "Invalid Value", 
                                       "Please enter a numeric value for 'less than' comparison.")
                     return
             elif condition == "contains":
                 df = df[df[column].astype(str).str.contains(value, case=False, na=False)]
             
             if len(df) == 0:
-                QMessageBox.warning(self, "No Data", 
+                modal.show_warning(self, "No Data", 
                                   "The filter returned no results. Please try a different filter.")
                 return
                 
@@ -732,11 +746,11 @@ class PreprocessingPanel(QWidget):
             # Update only the local view without emitting data_loaded signal
             self.update_data_view()
             
-            QMessageBox.information(self, "Success", 
+            modal.show_info(self, "Success", 
                                   "Filter applied successfully! Click 'Apply Changes to Main View' to update the main data preview.")
             
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error applying filter: {str(e)}")
+            modal.show_error(self, "Error", f"Error applying filter: {str(e)}")
 
     def handle_replace_click(self):
         """Handle replace button click."""
@@ -748,7 +762,7 @@ class PreprocessingPanel(QWidget):
         exact_match = self.exact_match_check.isChecked()
         
         if not find_value:
-            QMessageBox.warning(self, "Missing Information", 
+            modal.show_warning(self, "Missing Information", 
                               "Please enter a value to find.")
             return
             
@@ -777,7 +791,7 @@ class PreprocessingPanel(QWidget):
                             # Use pandas replace which can handle partial matches
                             df[column] = df[column].replace(find_numeric, replace_numeric)
                     except ValueError:
-                        QMessageBox.warning(self, "Type Mismatch", 
+                        modal.show_warning(self, "Type Mismatch", 
                                           "Cannot convert values to match column type.")
                         return
                 else:
@@ -816,11 +830,11 @@ class PreprocessingPanel(QWidget):
             # Update only the local view without emitting data_loaded signal
             self.update_data_view()
             
-            QMessageBox.information(self, "Success", 
+            modal.show_info(self, "Success", 
                                   "Replace operation completed successfully! Click 'Apply Changes to Main View' to update the main data preview.")
             
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error replacing values: {str(e)}")
+            modal.show_error(self, "Error", f"Error replacing values: {str(e)}")
 
     def update_data_view(self):
         """Update the main data view with current page of data."""
@@ -930,7 +944,7 @@ class PreprocessingPanel(QWidget):
     def rename_column(self, old_name, new_name):
         """Rename a column."""
         if new_name in self.data_manager.data.columns and new_name != old_name:
-            QMessageBox.warning(self, "Warning", "Column name already exists.")
+            modal.show_warning(self, "Warning", "Column name already exists.")
             return
             
         try:
@@ -945,11 +959,11 @@ class PreprocessingPanel(QWidget):
             # Update only the local view without emitting data_loaded signal
             self.update_data_view()
             
-            QMessageBox.information(self, "Success", 
+            modal.show_info(self, "Success", 
                                   f"Column '{old_name}' renamed to '{new_name}' successfully! Click 'Apply Changes to Main View' to update the main data preview.")
             
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error renaming column: {str(e)}")
+            modal.show_error(self, "Error", f"Error renaming column: {str(e)}")
 
     def remove_column(self, column_name):
         """Remove a column from the dataset."""
@@ -965,11 +979,11 @@ class PreprocessingPanel(QWidget):
             # Update only the local view without emitting data_loaded signal
             self.update_data_view()
             
-            QMessageBox.information(self, "Success", 
+            modal.show_info(self, "Success", 
                                   f"Column '{column_name}' removed successfully! Click 'Apply Changes to Main View' to update the main data preview.")
             
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error removing column: {str(e)}")
+            modal.show_error(self, "Error", f"Error removing column: {str(e)}")
 
     def show_filter_dialog(self, column_name, condition):
         """Show dialog for filter value input."""
@@ -1134,9 +1148,9 @@ class PreprocessingPanel(QWidget):
         if file_name:
             try:
                 self.data_manager.data.to_csv(file_name, index=False)
-                QMessageBox.information(self, "Success", "Data exported successfully!")
+                modal.show_info(self, "Success", "Data exported successfully!")
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"Error exporting data: {str(e)}")
+                modal.show_error(self, "Error", f"Error exporting data: {str(e)}")
 
     def change_column_type(self, column_name, new_type):
         """Change the data type of the selected column."""
@@ -1161,14 +1175,14 @@ class PreprocessingPanel(QWidget):
             # Update only the local view without emitting data_loaded signal
             self.update_data_view()
             
-            QMessageBox.information(self, "Success", 
+            modal.show_info(self, "Success", 
                                   f"Column '{column_name}' type changed to {new_type} successfully! Click 'Apply Changes to Main View' to update the main data preview.")
                                   
             # Update the dropdown to reflect the new type
             self.update_dtype_dropdown()
             
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error changing data type: {str(e)}")
+            modal.show_error(self, "Error", f"Error changing data type: {str(e)}")
 
     def update_outlier_view(self):
         """Update the outlier table view based on current filters."""
@@ -1301,18 +1315,18 @@ class PreprocessingPanel(QWidget):
             if show_info:
                 if total_outliers > 0:
                     display_outliers_count = display_outliers.sum()
-                    QMessageBox.information(self, "Outlier Detection", 
+                    modal.show_info(self, "Outlier Detection", 
                                           f"Found {total_outliers} outliers in total.\n"
                                           f"Showing {display_outliers_count} outliers in the first 1000 rows.")
                 else:
-                    QMessageBox.information(self, "Outlier Detection", 
+                    modal.show_info(self, "Outlier Detection", 
                                           "No outliers detected in the dataset.")
             
             progress.setValue(100)
             
         except Exception as e:
             if not progress.wasCanceled() and show_info:
-                QMessageBox.critical(self, "Error", f"Error detecting outliers: {str(e)}")
+                modal.show_error(self, "Error", f"Error detecting outliers: {str(e)}")
             self.outlier_table.setRowCount(0)
             self.current_outliers = None
         finally:
@@ -1405,14 +1419,14 @@ class PreprocessingPanel(QWidget):
             self.update_data_view()
             
             progress.setValue(100)
-            QMessageBox.information(self, "Success", 
+            modal.show_info(self, "Success", 
                                   f"Outliers handled successfully! "
                                   f"Handled {outlier_mask.sum()} outliers from the entire dataset. "
                                   f"Click 'Apply Changes to Main View' to update the main data preview.")
             
         except Exception as e:
             if not progress.wasCanceled():
-                QMessageBox.critical(self, "Error", f"Error handling outliers: {str(e)}")
+                modal.show_error(self, "Error", f"Error handling outliers: {str(e)}")
         finally:
             progress.close()
 
@@ -1488,10 +1502,10 @@ class PreprocessingPanel(QWidget):
 
             # Update only the local view without emitting data_loaded signal
             # Show success message
-            QMessageBox.information(self, "Success", "Changes applied to main view successfully!")
+            modal.show_info(self, "Success", "Changes applied to main view successfully!")
 
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error applying changes: {str(e)}")
+            modal.show_error(self, "Error", f"Error applying changes: {str(e)}")
         finally:
             if 'progress' in locals():
                 progress.close() 
@@ -1505,7 +1519,7 @@ class PreprocessingPanel(QWidget):
         digits = self.rounding_digits.value()
         
         if not column:
-            QMessageBox.warning(self, "Missing Information", 
+            modal.show_warning(self, "Missing Information", 
                               "Please select a column to round.")
             return
             
@@ -1517,7 +1531,7 @@ class PreprocessingPanel(QWidget):
             
             # Check if column is numeric
             if not pd.api.types.is_numeric_dtype(df[column]):
-                QMessageBox.warning(self, "Invalid Column Type", 
+                modal.show_warning(self, "Invalid Column Type", 
                                   "Rounding can only be applied to numeric columns.")
                 return
                 
@@ -1531,12 +1545,12 @@ class PreprocessingPanel(QWidget):
             self.update_data_view()
             self.data_manager.save_workspace_data()  # Autosave changes
 
-            QMessageBox.information(self, "Success",
+            modal.show_info(self, "Success",
                                   f"Column '{column}' rounded to {digits} decimal places successfully! "
                                   f"Click 'Apply Changes to Main View' to update the main data preview.")
             
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error applying rounding: {str(e)}")
+            modal.show_error(self, "Error", f"Error applying rounding: {str(e)}")
 
     def handle_split_click(self):
         """Handle split column button click."""
@@ -1547,12 +1561,12 @@ class PreprocessingPanel(QWidget):
         delimiter = self.split_delimiter.text()
         
         if not column:
-            QMessageBox.warning(self, "Missing Information", 
+            modal.show_warning(self, "Missing Information", 
                               "Please select a column to split.")
             return
             
         if not delimiter:
-            QMessageBox.warning(self, "Missing Information", 
+            modal.show_warning(self, "Missing Information", 
                               "Please enter a delimiter.")
             return
             
@@ -1595,16 +1609,16 @@ class PreprocessingPanel(QWidget):
                 
                 progress.setValue(100)
                 
-                QMessageBox.information(self, "Success", 
+                modal.show_info(self, "Success", 
                                       f"Column '{column}' split into {len(new_columns)} new columns successfully! "
                                       f"Click 'Apply Changes to Main View' to update the main data preview.")
             else:
-                QMessageBox.warning(self, "Split Failed", 
+                modal.show_warning(self, "Split Failed", 
                                   "The split operation did not produce any new columns. "
                                   "Please check your delimiter and try again.")
             
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error splitting column: {str(e)}")
+            modal.show_error(self, "Error", f"Error splitting column: {str(e)}")
         finally:
             if 'progress' in locals():
                 progress.close()
@@ -1617,7 +1631,7 @@ class PreprocessingPanel(QWidget):
         id_column = self.unpivot_id_column.currentText()
         
         if not id_column:
-            QMessageBox.warning(self, "Missing Information", 
+            modal.show_warning(self, "Missing Information", 
                               "Please select an ID column.")
             return
             
@@ -1637,7 +1651,7 @@ class PreprocessingPanel(QWidget):
             value_columns = [col for col in df.columns if col != id_column]
             
             if not value_columns:
-                QMessageBox.warning(self, "Invalid Selection", 
+                modal.show_warning(self, "Invalid Selection", 
                                   "There must be at least one column to unpivot.")
                 return
                 
@@ -1670,12 +1684,12 @@ class PreprocessingPanel(QWidget):
             
             progress.setValue(100)
             
-            QMessageBox.information(self, "Success", 
+            modal.show_info(self, "Success", 
                                   f"Unpivoted {len(value_columns)} columns successfully! "
                                   f"Click 'Apply Changes to Main View' to update the main data preview.")
             
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error unpivoting columns: {str(e)}")
+            modal.show_error(self, "Error", f"Error unpivoting columns: {str(e)}")
         finally:
             if 'progress' in locals():
                 progress.close()
@@ -1689,7 +1703,7 @@ class PreprocessingPanel(QWidget):
         aggregation = self.groupby_agg.currentText().lower()
         
         if not column:
-            QMessageBox.warning(self, "Missing Information", 
+            modal.show_warning(self, "Missing Information", 
                               "Please select a column to group by.")
             return
             
@@ -1711,7 +1725,7 @@ class PreprocessingPanel(QWidget):
                 numeric_columns.remove(column)
                 
             if not numeric_columns and aggregation != 'count':
-                QMessageBox.warning(self, "Invalid Selection", 
+                modal.show_warning(self, "Invalid Selection", 
                                   f"There are no numeric columns to apply '{aggregation}' aggregation. "
                                   f"Only 'count' can be used with non-numeric data.")
                 return
@@ -1737,12 +1751,12 @@ class PreprocessingPanel(QWidget):
             
             progress.setValue(100)
             
-            QMessageBox.information(self, "Success", 
+            modal.show_info(self, "Success", 
                                   f"Data grouped by '{column}' with '{aggregation}' aggregation successfully! "
                                   f"Click 'Apply Changes to Main View' to update the main data preview.")
 
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error grouping data: {str(e)}")
+            modal.show_error(self, "Error", f"Error grouping data: {str(e)}")
         finally:
             if 'progress' in locals():
                 progress.close()
@@ -1788,11 +1802,11 @@ class PreprocessingPanel(QWidget):
             self.update_data_view()
             self.data_manager.data_loaded.emit(df)
             self.data_modified.emit()
-            QMessageBox.information(self, "Success", f"Missing values handled using '{action}'.")
+            modal.show_info(self, "Success", f"Missing values handled using '{action}'.")
 
         except Exception as e:
             self.undo()
-            QMessageBox.critical(self, "Error", f"Error handling missing values: {str(e)}")
+            modal.show_error(self, "Error", f"Error handling missing values: {str(e)}")
 
     def handle_duplicates(self):
         """Handle duplicates."""
@@ -1820,11 +1834,11 @@ class PreprocessingPanel(QWidget):
             self.update_data_view()
             self.data_manager.data_loaded.emit(df)
             self.data_modified.emit()
-            QMessageBox.information(self, "Success", f"Removed {removed} duplicate rows.")
+            modal.show_info(self, "Success", f"Removed {removed} duplicate rows.")
 
         except Exception as e:
             self.undo()
-            QMessageBox.critical(self, "Error", f"Error handling duplicates: {str(e)}")
+            modal.show_error(self, "Error", f"Error handling duplicates: {str(e)}")
 
     def _copy_data_view_selection(self):
         """Copy selected cells from the data_view to the clipboard."""

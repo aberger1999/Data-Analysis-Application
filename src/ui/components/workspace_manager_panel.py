@@ -4,9 +4,10 @@ Workspace manager panel for organizing data files, graphs, and reports.
 
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
-    QLabel, QPushButton, QGridLayout, QMessageBox,
+    QLabel, QPushButton, QGridLayout,
     QFrame, QScrollArea, QFileDialog, QLineEdit
 )
+from . import modal
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont, QIcon
 import os
@@ -261,7 +262,7 @@ class WorkspaceManagerPanel(QWidget):
         self.workspace_changed.emit(workspace_path)
         self.load_workspaces()
         
-        QMessageBox.information(
+        modal.show_info(
             self,
             "Workspace Activated",
             f"Workspace {workspace_id} is now active.\n\n"
@@ -270,15 +271,14 @@ class WorkspaceManagerPanel(QWidget):
     
     def delete_workspace(self, workspace_id):
         """Delete workspace contents."""
-        reply = QMessageBox.question(
+        confirmed = modal.show_question(
             self,
             "Delete Workspace",
             f"Are you sure you want to delete all contents of Workspace {workspace_id}?\n\n"
-            "This will remove all data files, graphs, and reports in this workspace.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            "This will remove all data files, graphs, and reports in this workspace."
         )
-        
-        if reply == QMessageBox.StandardButton.Yes:
+
+        if confirmed:
             workspace_path = os.path.join(self.workspaces_dir, f"workspace_{workspace_id}")
 
             for folder in ["data", "graphs", "reports"]:
@@ -309,7 +309,7 @@ class WorkspaceManagerPanel(QWidget):
             
             self.load_workspaces()
             
-            QMessageBox.information(
+            modal.show_info(
                 self,
                 "Workspace Deleted",
                 f"Workspace {workspace_id} has been cleared."
@@ -321,7 +321,7 @@ class WorkspaceManagerPanel(QWidget):
             path = os.path.join(self.workspaces_dir, f"workspace_{self.active_workspace}", "data")
             os.startfile(os.path.abspath(path))
         else:
-            QMessageBox.warning(self, "No Active Workspace", "Please activate a workspace first.")
+            modal.show_warning(self, "No Active Workspace", "Please activate a workspace first.")
     
     def open_graphs_folder(self):
         """Open the graphs folder of active workspace."""
@@ -329,7 +329,7 @@ class WorkspaceManagerPanel(QWidget):
             path = os.path.join(self.workspaces_dir, f"workspace_{self.active_workspace}", "graphs")
             os.startfile(os.path.abspath(path))
         else:
-            QMessageBox.warning(self, "No Active Workspace", "Please activate a workspace first.")
+            modal.show_warning(self, "No Active Workspace", "Please activate a workspace first.")
     
     def open_reports_folder(self):
         """Open the reports folder of active workspace."""
@@ -337,7 +337,7 @@ class WorkspaceManagerPanel(QWidget):
             path = os.path.join(self.workspaces_dir, f"workspace_{self.active_workspace}", "reports")
             os.startfile(os.path.abspath(path))
         else:
-            QMessageBox.warning(self, "No Active Workspace", "Please activate a workspace first.")
+            modal.show_warning(self, "No Active Workspace", "Please activate a workspace first.")
     
     def get_active_workspace_path(self):
         """Get the path of the active workspace."""

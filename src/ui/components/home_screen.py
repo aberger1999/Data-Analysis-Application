@@ -1,15 +1,15 @@
 """
-Modern home screen for workspace selection and settings.
+Modern home screen for workspace selection.
 """
 
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QFrame, QGridLayout, QScrollArea,
     QDialog, QLineEdit, QGroupBox,
-    QComboBox, QCheckBox, QSpinBox
+    QSizePolicy
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QPropertyAnimation, QEasingCurve, QRect
-from PyQt5.QtGui import QFont, QIcon, QPalette, QColor
+from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtGui import QFont
 from ..theme import get_colors, RADIUS_LG, RADIUS_MD, RADIUS_SM
 from . import modal
 import os
@@ -490,208 +490,89 @@ class RenameWorkspaceDialog(QDialog):
         return self.name_input.text().strip()
 
 
-class SettingsDialog(QDialog):
-    """Dialog for application settings."""
+class ThemeToggle(QWidget):
+    """Compact segmented Dark/Light theme toggle for the home screen."""
 
     theme_changed = pyqtSignal(str)
 
-    def __init__(self, parent=None, current_theme="dark"):
-        super().__init__(parent, Qt.FramelessWindowHint)
+    def __init__(self, current_theme="dark", parent=None):
+        super().__init__(parent)
         self.current_theme = current_theme
-        self.setModal(True)
-        self.setAttribute(Qt.WA_TranslucentBackground)
-        self.init_ui()
 
-    def init_ui(self):
-        c = get_colors("dark")
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
 
-        self._overlay = QWidget(self)
-        self._overlay.setStyleSheet("background: rgba(0, 0, 0, 0.6);")
+        self.dark_btn = QPushButton("🌙 Dark")
+        self.light_btn = QPushButton("☀ Light")
+        for btn in (self.dark_btn, self.light_btn):
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.setFixedHeight(32)
+            btn.setMinimumWidth(78)
 
-        self._box = QWidget(self._overlay)
-        self._box.setStyleSheet(f"""
-            QWidget {{
-                background-color: #1e2433;
-                border: 1px solid rgba(255,255,255,0.10);
-                border-radius: 10px;
-            }}
-        """)
-        box_layout = QVBoxLayout(self._box)
-        box_layout.setContentsMargins(24, 24, 24, 24)
-        box_layout.setSpacing(16)
+        self.dark_btn.clicked.connect(lambda: self._select("dark"))
+        self.light_btn.clicked.connect(lambda: self._select("light"))
 
-        title_label = QLabel("Settings")
-        title_label.setStyleSheet(f"""
-            QLabel {{
-                color: {c['text_primary']};
-                font-size: 16px;
-                font-weight: 700;
-                background: transparent;
-                border: none;
-            }}
-        """)
-        box_layout.addWidget(title_label)
+        layout.addWidget(self.dark_btn)
+        layout.addWidget(self.light_btn)
 
-        # ─ Appearance
-        section_lbl = QLabel("APPEARANCE")
-        section_lbl.setStyleSheet(f"""
-            QLabel {{
-                color: {c['accent']};
-                font-size: 10px;
-                font-weight: 700;
-                letter-spacing: 1.2px;
-                background: transparent;
-                border: none;
-            }}
-        """)
-        box_layout.addWidget(section_lbl)
+        self.setFixedWidth(160)
+        self._refresh_styles()
 
-        theme_row = QHBoxLayout()
-        theme_lbl = QLabel("Theme:")
-        theme_lbl.setStyleSheet(f"color: #9ca3af; font-size: 13px; background: transparent; border: none;")
-        theme_row.addWidget(theme_lbl)
-        self.theme_combo = QComboBox()
-        self.theme_combo.addItems(["Dark", "Light"])
-        self.theme_combo.setCurrentText(self.current_theme.capitalize())
-        self.theme_combo.currentTextChanged.connect(self.on_theme_changed)
-        self.theme_combo.setStyleSheet(f"""
-            QComboBox {{
-                background-color: {c['bg_input']};
-                color: {c['text_primary']};
-                border: 1px solid rgba(255,255,255,0.12);
-                border-radius: 6px;
-                padding: 6px 10px;
-                min-height: 22px;
-                min-width: 120px;
-            }}
-        """)
-        theme_row.addWidget(self.theme_combo)
-        theme_row.addStretch()
-        box_layout.addLayout(theme_row)
+    def _select(self, theme):
+        if theme == self.current_theme:
+            return
+        self.current_theme = theme
+        self._refresh_styles()
+        self.theme_changed.emit(theme)
 
-        # ─ Data Settings
-        data_lbl = QLabel("DATA SETTINGS")
-        data_lbl.setStyleSheet(f"""
-            QLabel {{
-                color: {c['accent']};
-                font-size: 10px;
-                font-weight: 700;
-                letter-spacing: 1.2px;
-                background: transparent;
-                border: none;
-            }}
-        """)
-        box_layout.addWidget(data_lbl)
+    def set_theme(self, theme):
+        """Update the active theme without emitting a change signal."""
+        self.current_theme = theme
+        self._refresh_styles()
 
-        self.auto_save_check = QCheckBox("Auto-save data on changes")
-        self.auto_save_check.setChecked(True)
-        self.auto_save_check.setStyleSheet(f"color: {c['text_primary']}; background: transparent; border: none;")
-        box_layout.addWidget(self.auto_save_check)
-
-        dec_row = QHBoxLayout()
-        dec_lbl = QLabel("Decimal places:")
-        dec_lbl.setStyleSheet(f"color: #9ca3af; font-size: 13px; background: transparent; border: none;")
-        dec_row.addWidget(dec_lbl)
-        self.decimal_spin = QSpinBox()
-        self.decimal_spin.setRange(0, 10)
-        self.decimal_spin.setValue(2)
-        self.decimal_spin.setStyleSheet(f"""
-            QSpinBox {{
-                background-color: {c['bg_input']};
-                color: {c['text_primary']};
-                border: 1px solid rgba(255,255,255,0.12);
-                border-radius: 6px;
-                padding: 6px 10px;
-                min-height: 22px;
-                min-width: 60px;
-            }}
-        """)
-        dec_row.addWidget(self.decimal_spin)
-        dec_row.addStretch()
-        box_layout.addLayout(dec_row)
-
-        # ─ Visualization
-        viz_lbl = QLabel("VISUALIZATION")
-        viz_lbl.setStyleSheet(f"""
-            QLabel {{
-                color: {c['accent']};
-                font-size: 10px;
-                font-weight: 700;
-                letter-spacing: 1.2px;
-                background: transparent;
-                border: none;
-            }}
-        """)
-        box_layout.addWidget(viz_lbl)
-
-        dpi_row = QHBoxLayout()
-        dpi_lbl = QLabel("Export DPI:")
-        dpi_lbl.setStyleSheet(f"color: #9ca3af; font-size: 13px; background: transparent; border: none;")
-        dpi_row.addWidget(dpi_lbl)
-        self.dpi_combo = QComboBox()
-        self.dpi_combo.addItems(["150", "300", "600"])
-        self.dpi_combo.setCurrentText("300")
-        self.dpi_combo.setStyleSheet(f"""
-            QComboBox {{
-                background-color: {c['bg_input']};
-                color: {c['text_primary']};
-                border: 1px solid rgba(255,255,255,0.12);
-                border-radius: 6px;
-                padding: 6px 10px;
-                min-height: 22px;
-                min-width: 80px;
-            }}
-        """)
-        dpi_row.addWidget(self.dpi_combo)
-        dpi_row.addStretch()
-        box_layout.addLayout(dpi_row)
-
-        # Close button
-        btn_layout = QHBoxLayout()
-        btn_layout.addStretch()
-        close_btn = QPushButton("Close")
-        close_btn.setCursor(Qt.PointingHandCursor)
-        close_btn.setStyleSheet(f"""
+    def _chip_style(self, selected):
+        c = get_colors(self.current_theme)
+        if selected:
+            return f"""
+                QPushButton {{
+                    background-color: {c['accent']};
+                    color: {c['text_inverse']};
+                    border: 1px solid {c['accent']};
+                    border-radius: 14px;
+                    padding: 4px 12px;
+                    font-size: 12px;
+                    font-weight: 600;
+                    min-height: 28px;
+                    max-height: 28px;
+                }}
+                QPushButton:hover {{
+                    background-color: {c['accent_hover']};
+                }}
+            """
+        return f"""
             QPushButton {{
-                background-color: {c['accent']};
-                color: {c['text_inverse']};
-                border: none;
-                border-radius: 6px;
-                padding: 8px 20px;
+                background-color: {c['bg_tertiary']};
+                color: {c['text_secondary']};
+                border: 1px solid {c['border']};
+                border-radius: 14px;
+                padding: 4px 12px;
                 font-size: 12px;
                 font-weight: 600;
-                min-height: 0px;
+                min-height: 28px;
+                max-height: 28px;
             }}
             QPushButton:hover {{
-                background-color: {c['accent_hover']};
+                background-color: {c['bg_hover']};
+                color: {c['text_primary']};
+                border-color: {c['accent']};
             }}
-        """)
-        close_btn.clicked.connect(self.accept)
-        btn_layout.addWidget(close_btn)
-        box_layout.addLayout(btn_layout)
+        """
 
-    def _layout_children(self):
-        if self.parent():
-            self.resize(self.parent().size())
-            self.move(self.parent().mapToGlobal(self.parent().rect().topLeft()))
-        self._overlay.setGeometry(0, 0, self.width(), self.height())
-        box_w = min(480, self.width() - 60)
-        self._box.setFixedWidth(box_w)
-        self._box.adjustSize()
-        bx = (self.width() - box_w) // 2
-        by = (self.height() - self._box.height()) // 2
-        self._box.move(bx, by)
+    def _refresh_styles(self):
+        self.dark_btn.setStyleSheet(self._chip_style(self.current_theme == "dark"))
+        self.light_btn.setStyleSheet(self._chip_style(self.current_theme == "light"))
 
-    def showEvent(self, event):
-        super().showEvent(event)
-        self._layout_children()
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self._layout_children()
-
-    def on_theme_changed(self, theme):
-        self.theme_changed.emit(theme.lower())
 
 class HomeScreen(QWidget):
     """Modern home screen with workspace selection."""
@@ -747,7 +628,13 @@ class HomeScreen(QWidget):
 
     def init_ui(self):
         """Initialize the user interface."""
-        layout = QVBoxLayout(self)
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.setSpacing(0)
+
+        # Content area with padding
+        content_widget = QWidget()
+        layout = QVBoxLayout(content_widget)
         layout.setContentsMargins(48, 40, 48, 0)
         layout.setSpacing(24)
 
@@ -755,26 +642,55 @@ class HomeScreen(QWidget):
         header_layout = QHBoxLayout()
 
         title_layout = QVBoxLayout()
-        title_layout.setSpacing(6)
-        title_label = QLabel("DataLens")
-        title_font = QFont()
-        title_font.setPointSize(22)
-        title_font.setBold(True)
-        title_label.setFont(title_font)
-        title_layout.addWidget(title_label)
+        title_layout.setSpacing(4)
 
-        self.subtitle_label = QLabel("Select a workspace to begin your analysis")
-        subtitle_font = QFont()
-        subtitle_font.setPointSize(11)
-        self.subtitle_label.setFont(subtitle_font)
+        # Title row: logo + "DataLens" inline
+        title_row = QHBoxLayout()
+        title_row.setSpacing(0)
+        title_row.setContentsMargins(0, 0, 0, 0)
+
+        # Logo inline with title
+        import sys
+        try:
+            logo_base = sys._MEIPASS
+        except Exception:
+            logo_base = os.path.dirname(os.path.dirname(os.path.dirname(
+                os.path.dirname(os.path.abspath(__file__)))))
+        logo_path = os.path.join(logo_base, 'assets', 'DataLens_Logo_cropped.png')
+        if os.path.exists(logo_path):
+            from PyQt5.QtGui import QPixmap
+            logo_label = QLabel()
+            pixmap = QPixmap(logo_path)
+            scaled = pixmap.scaledToHeight(52, Qt.SmoothTransformation)
+            logo_label.setPixmap(scaled)
+            logo_label.setStyleSheet("background: transparent; border: none; margin-right: 8px;")
+            title_row.addWidget(logo_label)
+
+        self.title_label = QLabel("DataLens")
+        self.title_label.setStyleSheet("""
+            QLabel {
+                font-size: 32px;
+                font-weight: 700;
+                letter-spacing: -0.5px;
+                background: transparent;
+                border: none;
+            }
+        """)
+        title_row.addWidget(self.title_label)
+        title_row.addStretch()
+        title_layout.addLayout(title_row)
+
+        self.subtitle_label = QLabel("Your data. Clearer than ever.")
+        sub_color = "#94a3b8" if self.current_theme == "dark" else "#475569"
+        self.subtitle_label.setStyleSheet(f"color: {sub_color}; font-size: 14px; font-weight: 400; background: transparent;")
         title_layout.addWidget(self.subtitle_label)
 
         header_layout.addLayout(title_layout)
         header_layout.addStretch()
 
-        self.settings_btn = QPushButton("Settings")
-        self.settings_btn.clicked.connect(self.show_settings)
-        header_layout.addWidget(self.settings_btn)
+        self.theme_toggle = ThemeToggle(self.current_theme)
+        self.theme_toggle.theme_changed.connect(self.on_theme_changed)
+        header_layout.addWidget(self.theme_toggle, 0, Qt.AlignVCenter)
 
         layout.addLayout(header_layout)
 
@@ -815,12 +731,16 @@ class HomeScreen(QWidget):
         scroll_area.setWidget(self.workspaces_container)
         layout.addWidget(scroll_area)
 
+        outer_layout.addWidget(content_widget, 1)
+
         # ── Footer ──
         c = get_colors(self.current_theme)
         self.footer_frame = QFrame()
         self.footer_frame.setFixedHeight(36)
+        self.footer_frame.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.footer_frame.setContentsMargins(0, 0, 0, 0)
         footer_layout = QHBoxLayout(self.footer_frame)
-        footer_layout.setContentsMargins(48, 0, 48, 0)
+        footer_layout.setContentsMargins(16, 0, 16, 0)
         footer_layout.setSpacing(0)
 
         left_label = QLabel("DataLens")
@@ -841,7 +761,7 @@ class HomeScreen(QWidget):
         version_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         footer_layout.addWidget(version_label)
 
-        layout.addWidget(self.footer_frame)
+        outer_layout.addWidget(self.footer_frame)
 
         self.update_home_theme()
 
@@ -849,7 +769,20 @@ class HomeScreen(QWidget):
         """Update theme for home screen elements."""
         c = get_colors(self.current_theme)
 
-        self.subtitle_label.setStyleSheet(f"color: {c['text_secondary']}; font-size: 11pt;")
+        # Title text color follows theme
+        title_color = "#ffffff" if self.current_theme == "dark" else "#0f172a"
+        self.title_label.setStyleSheet(f"""
+            QLabel {{
+                color: {title_color};
+                font-size: 32px;
+                font-weight: 700;
+                letter-spacing: -0.5px;
+                background: transparent;
+                border: none;
+            }}
+        """)
+        sub_color = "#94a3b8" if self.current_theme == "dark" else "#475569"
+        self.subtitle_label.setStyleSheet(f"color: {sub_color}; font-size: 14px; font-weight: 400; background: transparent;")
         self.separator.setStyleSheet(f"background-color: {c['border']};")
 
         self.footer_frame.setStyleSheet(f"""
@@ -859,11 +792,8 @@ class HomeScreen(QWidget):
             }}
         """)
 
-        # Settings uses the global outline style
-        self.settings_btn.setProperty("cssClass", "outline")
-        self.settings_btn.setStyleSheet("")
-        self.settings_btn.style().unpolish(self.settings_btn)
-        self.settings_btn.style().polish(self.settings_btn)
+        # Theme toggle restyles itself for the active theme
+        self.theme_toggle.set_theme(self.current_theme)
 
         # New workspace uses the global primary style
         self.create_workspace_btn.setProperty("cssClass", "primary")
@@ -1032,12 +962,6 @@ class HomeScreen(QWidget):
                         "Delete Failed",
                         f"Failed to delete workspace: {str(e)}"
                     )
-
-    def show_settings(self):
-        """Show settings dialog."""
-        dialog = SettingsDialog(self, self.current_theme)
-        dialog.theme_changed.connect(self.on_theme_changed)
-        dialog.exec()
 
     def on_theme_changed(self, theme):
         """Handle theme change."""

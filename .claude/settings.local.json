@@ -6,7 +6,11 @@
       "Bash(./venv/Scripts/pyinstaller.exe:*)",
       "Bash(./venv/Scripts/python.exe -m PyInstaller:*)",
       "Bash(test:*)",
-      "Bash(\"/c/Program Files \\(x86\\)/Inno Setup 6/ISCC.exe\" \"installer/inno_setup.iss\")"
+      "Bash(\"/c/Program Files \\(x86\\)/Inno Setup 6/ISCC.exe\" \"installer/inno_setup.iss\")",
+      "Bash(python -m py_compile src/main.py)",
+      "Bash(python -m py_compile src/ui/main_window.py)",
+      "Bash(python -m py_compile src/ui/components/home_screen.py)",
+      "Bash(python -m py_compile src/ui/components/preprocessing_panel.py)"
     ]
   }
 }

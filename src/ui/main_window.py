@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget,
     QApplication, QPushButton, QLabel, QFrame, QSizePolicy
 )
-from PyQt5.QtCore import Qt, QPoint, QSize
+from PyQt5.QtCore import Qt, QPoint, QSize, QSettings
 from PyQt5.QtGui import QPalette, QColor, QIcon, QFont, QCursor
 from .components.home_screen import HomeScreen
 from .components.workspace_view import WorkspaceView
@@ -25,7 +25,7 @@ class _TitleBar(QWidget):
         self._window = parent_window
         self._drag_pos = None
         self._is_maximized = False
-        self.setFixedHeight(40)
+        self.setFixedHeight(42)
         self.setObjectName("customTitleBar")
 
         c = get_colors("dark")
@@ -42,11 +42,14 @@ class _TitleBar(QWidget):
         layout.setSpacing(8)
 
         # App icon
-        icon_path = parent_window._resource_path('icon.png')
+        icon_path = parent_window._resource_path(os.path.join('assets', 'DataLens_Logo.png'))
         if os.path.exists(icon_path):
+            from PyQt5.QtGui import QPixmap
             icon_label = QLabel()
-            icon_label.setPixmap(QIcon(icon_path).pixmap(QSize(18, 18)))
-            icon_label.setStyleSheet("background: transparent; border: none;")
+            pixmap = QPixmap(icon_path)
+            scaled = pixmap.scaledToHeight(30, Qt.SmoothTransformation)
+            icon_label.setPixmap(scaled)
+            icon_label.setStyleSheet("background: transparent; border: none; margin-right: 4px;")
             layout.addWidget(icon_label)
 
         # Title text
@@ -76,7 +79,7 @@ class _TitleBar(QWidget):
                 min-height: 0px;
                 min-width: 46px;
                 max-width: 46px;
-                max-height: 40px;
+                max-height: 42px;
             }}
             QPushButton:hover {{
                 background-color: rgba(255,255,255,0.1);
@@ -94,7 +97,7 @@ class _TitleBar(QWidget):
                 min-height: 0px;
                 min-width: 46px;
                 max-width: 46px;
-                max-height: 40px;
+                max-height: 42px;
             }}
             QPushButton:hover {{
                 background-color: #ef4444;
@@ -104,21 +107,21 @@ class _TitleBar(QWidget):
 
         self.min_btn = QPushButton("─")
         self.min_btn.setStyleSheet(btn_style_base)
-        self.min_btn.setFixedSize(46, 40)
+        self.min_btn.setFixedSize(46, 42)
         self.min_btn.setCursor(QCursor(Qt.PointingHandCursor))
         self.min_btn.clicked.connect(self._window.showMinimized)
         layout.addWidget(self.min_btn)
 
         self.max_btn = QPushButton("□")
         self.max_btn.setStyleSheet(btn_style_base)
-        self.max_btn.setFixedSize(46, 40)
+        self.max_btn.setFixedSize(46, 42)
         self.max_btn.setCursor(QCursor(Qt.PointingHandCursor))
         self.max_btn.clicked.connect(self._toggle_maximize)
         layout.addWidget(self.max_btn)
 
         self.close_btn = QPushButton("✕")
         self.close_btn.setStyleSheet(close_btn_style)
-        self.close_btn.setFixedSize(46, 40)
+        self.close_btn.setFixedSize(46, 42)
         self.close_btn.setCursor(QCursor(Qt.PointingHandCursor))
         self.close_btn.clicked.connect(self._window.close)
         layout.addWidget(self.close_btn)
@@ -163,10 +166,16 @@ class MainWindow(QMainWindow):
     def __init__(self):
         """Initialize the main window."""
         super().__init__()
-        self.current_theme = "dark"
-        self.setWindowFlags(Qt.FramelessWindowHint)
+        self._settings = QSettings()
+        self.current_theme = self._load_theme()
+        self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
         self.init_ui()
         self.setup_connections()
+
+    def _load_theme(self):
+        """Load persisted theme; defaults to 'dark'."""
+        value = self._settings.value("theme", "dark")
+        return value if value in ("dark", "light") else "dark"
 
     def _resource_path(self, relative_path):
         """
@@ -184,9 +193,11 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("DataLens")
         self.setMinimumSize(1200, 800)
 
-        icon_path = self._resource_path('icon.png')
+        # Set icon explicitly on this window (supplements QApplication icon)
+        icon_path = self._resource_path(os.path.join('assets', 'DataLens_Logo.ico'))
         if os.path.exists(icon_path):
-            self.setWindowIcon(QIcon(icon_path))
+            icon = QIcon(icon_path)
+            self.setWindowIcon(icon)
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -200,9 +211,7 @@ class MainWindow(QMainWindow):
 
         self.stacked_widget = QStackedWidget()
 
-        self.current_theme = "dark"
-
-        self.home_screen = HomeScreen(initial_theme="dark")
+        self.home_screen = HomeScreen(initial_theme=self.current_theme)
         self.stacked_widget.addWidget(self.home_screen)
 
         self.workspace_view = WorkspaceView()
@@ -211,8 +220,9 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.stacked_widget)
 
         # Apply the centralized theme
-        apply_theme("dark")
-        self.workspace_view.update_theme("dark")
+        apply_theme(self.current_theme)
+        self.workspace_view.update_theme(self.current_theme)
+        self._apply_titlebar_theme(self.current_theme)
 
     def setup_connections(self):
         """Setup signal connections."""
@@ -242,7 +252,11 @@ class MainWindow(QMainWindow):
         self.current_theme = theme
         apply_theme(theme)
         self.workspace_view.update_theme(theme)
-        # Update title bar colors
+        self._apply_titlebar_theme(theme)
+        self._settings.setValue("theme", theme)
+
+    def _apply_titlebar_theme(self, theme):
+        """Refresh title bar styling for the given theme."""
         c = get_colors(theme)
         self.title_bar.setStyleSheet(f"""
             QWidget#customTitleBar {{

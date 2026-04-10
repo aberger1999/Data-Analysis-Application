@@ -488,8 +488,23 @@ class VisualizationPanel(QWidget):
 
         # Export buttons
         export_group = QGroupBox("Export Options")
-        export_layout = QHBoxLayout(export_group)
+        export_group_layout = QVBoxLayout(export_group)
 
+        # DPI override (per-session, defaults to 300)
+        dpi_row = QHBoxLayout()
+        dpi_label = QLabel("Export DPI:")
+        self.export_dpi_spinbox = QSpinBox()
+        self.export_dpi_spinbox.setRange(72, 600)
+        self.export_dpi_spinbox.setSingleStep(50)
+        self.export_dpi_spinbox.setValue(300)
+        self.export_dpi_spinbox.setSuffix(" DPI")
+        self.export_dpi_spinbox.setFixedWidth(120)
+        dpi_row.addWidget(dpi_label)
+        dpi_row.addWidget(self.export_dpi_spinbox)
+        dpi_row.addStretch()
+        export_group_layout.addLayout(dpi_row)
+
+        export_buttons_row = QHBoxLayout()
         self.export_png_btn = QPushButton("Export PNG")
         self.export_png_btn.setProperty("cssClass", "primary")
         self.export_pdf_btn = QPushButton("Export PDF")
@@ -497,9 +512,10 @@ class VisualizationPanel(QWidget):
         self.export_svg_btn = QPushButton("Export SVG")
         self.export_svg_btn.setProperty("cssClass", "primary")
 
-        export_layout.addWidget(self.export_png_btn)
-        export_layout.addWidget(self.export_pdf_btn)
-        export_layout.addWidget(self.export_svg_btn)
+        export_buttons_row.addWidget(self.export_png_btn)
+        export_buttons_row.addWidget(self.export_pdf_btn)
+        export_buttons_row.addWidget(self.export_svg_btn)
+        export_group_layout.addLayout(export_buttons_row)
 
         advanced_layout.addWidget(export_group, row, 0, 1, 2)
 
@@ -807,7 +823,7 @@ class VisualizationPanel(QWidget):
 
         if file_path:
             try:
-                self.figure.savefig(file_path, format=format_type, dpi=300, bbox_inches='tight')
+                self.figure.savefig(file_path, format=format_type, dpi=self.export_dpi_spinbox.value(), bbox_inches='tight')
                 print(f"Plot saved to {file_path}")
             except Exception as e:
                 print(f"Error saving plot: {str(e)}")

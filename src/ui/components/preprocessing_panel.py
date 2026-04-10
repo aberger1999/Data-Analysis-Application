@@ -271,7 +271,9 @@ class PreprocessingPanel(QWidget):
         self.rows_per_page_label = QLabel("Rows per page:")
         self.rows_per_page_combo = QComboBox()
         self.rows_per_page_combo.addItems(["50", "100", "500", "1000"])
-        
+        self.page_spin.setEnabled(False)
+        self.rows_per_page_combo.setEnabled(False)
+
         pagination.addWidget(self.page_label)
         pagination.addWidget(self.page_spin)
         pagination.addWidget(self.rows_per_page_label)
@@ -1021,6 +1023,10 @@ class PreprocessingPanel(QWidget):
             self.data_view.clear()
             self.data_view.setRowCount(0)
             self.data_view.setColumnCount(0)
+            self.page_spin.setEnabled(False)
+            self.rows_per_page_combo.setEnabled(False)
+            self.undo_btn.setEnabled(False)
+            self.redo_btn.setEnabled(False)
             return
 
         # Set the data loaded flag
@@ -1077,6 +1083,8 @@ class PreprocessingPanel(QWidget):
         self.dtype_combo.blockSignals(False)
         
         # Reset pagination
+        self.page_spin.setEnabled(True)
+        self.rows_per_page_combo.setEnabled(True)
         self.page_spin.setValue(1)
         
         # Update views

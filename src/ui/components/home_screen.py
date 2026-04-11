@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont
-from ..theme import get_colors, RADIUS_LG, RADIUS_MD, RADIUS_SM
+from ..theme import get_colors, current_theme, RADIUS_LG, RADIUS_MD, RADIUS_SM
 from . import modal
 import os
 import json
@@ -319,7 +319,10 @@ class CreateWorkspaceDialog(QDialog):
         self.init_ui()
 
     def init_ui(self):
-        c = get_colors("dark")
+        theme = current_theme()
+        c = get_colors(theme)
+        is_dark = theme == "dark"
+        input_border = "rgba(255,255,255,0.12)" if is_dark else "rgba(0,0,0,0.14)"
 
         # Overlay
         self._overlay = QWidget(self)
@@ -329,8 +332,8 @@ class CreateWorkspaceDialog(QDialog):
         self._box = QWidget(self._overlay)
         self._box.setStyleSheet(f"""
             QWidget {{
-                background-color: #1e2433;
-                border: 1px solid rgba(255,255,255,0.10);
+                background-color: {c['bg_primary']};
+                border: 1px solid {c['border']};
                 border-radius: 10px;
             }}
         """)
@@ -353,7 +356,7 @@ class CreateWorkspaceDialog(QDialog):
         desc_label = QLabel("Enter a name for your new workspace:")
         desc_label.setStyleSheet(f"""
             QLabel {{
-                color: #9ca3af;
+                color: {c['text_secondary']};
                 font-size: 13px;
                 background: transparent;
                 border: none;
@@ -367,7 +370,7 @@ class CreateWorkspaceDialog(QDialog):
             QLineEdit {{
                 background-color: {c['bg_input']};
                 color: {c['text_primary']};
-                border: 1px solid rgba(255,255,255,0.12);
+                border: 1px solid {input_border};
                 border-radius: 6px;
                 padding: 8px 12px;
                 font-size: 13px;

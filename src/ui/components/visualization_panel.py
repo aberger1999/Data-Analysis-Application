@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 import os
-from ..theme import apply_dark_theme, apply_chart_theme, current_theme
+from ..theme import apply_dark_theme, apply_chart_theme, current_theme, get_colors
 
 
 class _StyledSplitterHandle(QWidget):
@@ -155,6 +155,11 @@ class ConfigureLayoutDialog(QDialog):
         self._initial = self._current_params()
         self._drag_pos = None
 
+        # Snapshot theme at build time (dialogs are recreated on each open)
+        self._theme = current_theme()
+        self._c = get_colors(self._theme)
+        self._is_dark = self._theme == "dark"
+
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setModal(True)
@@ -183,6 +188,12 @@ class ConfigureLayoutDialog(QDialog):
     # ── UI construction ────────────────────────────────────────────────
 
     def _build_ui(self):
+        c = self._c
+        body_bg = c['bg_primary']
+        title_bar_bg = c['bg_base']
+        title_text = c['text_inverse'] if self._is_dark else c['text_primary']
+        close_icon_color = c['text_secondary']
+
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
@@ -190,12 +201,12 @@ class ConfigureLayoutDialog(QDialog):
         # Rounded container frame with border
         self._frame = QFrame()
         self._frame.setObjectName("configureLayoutFrame")
-        self._frame.setStyleSheet("""
-            QFrame#configureLayoutFrame {
-                background: #1a1f2e;
-                border: 1px solid rgba(255,255,255,0.1);
+        self._frame.setStyleSheet(f"""
+            QFrame#configureLayoutFrame {{
+                background: {body_bg};
+                border: 1px solid {c['border']};
                 border-radius: 10px;
-            }
+            }}
         """)
         outer.addWidget(self._frame)
 
@@ -206,13 +217,13 @@ class ConfigureLayoutDialog(QDialog):
         # ── Custom title bar ───────────────────────────────────────────
         self._title_bar = QWidget()
         self._title_bar.setFixedHeight(36)
-        self._title_bar.setStyleSheet("""
-            QWidget {
-                background: #0f1117;
+        self._title_bar.setStyleSheet(f"""
+            QWidget {{
+                background: {title_bar_bg};
                 border-top-left-radius: 10px;
                 border-top-right-radius: 10px;
                 border: none;
-            }
+            }}
         """)
         title_lay = QHBoxLayout(self._title_bar)
         title_lay.setContentsMargins(14, 0, 6, 0)
@@ -220,7 +231,7 @@ class ConfigureLayoutDialog(QDialog):
 
         title_label = QLabel("Configure Layout")
         title_label.setStyleSheet(
-            "color: #ffffff; font-size: 13px; font-weight: 500; "
+            f"color: {title_text}; font-size: 13px; font-weight: 500; "
             "background: transparent; border: none;"
         )
         title_lay.addWidget(title_label)
@@ -229,20 +240,20 @@ class ConfigureLayoutDialog(QDialog):
         close_btn = QPushButton("\u2715")
         close_btn.setFixedSize(28, 28)
         close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        close_btn.setStyleSheet("""
-            QPushButton {
+        close_btn.setStyleSheet(f"""
+            QPushButton {{
                 background: transparent;
-                color: #cbd5e1;
+                color: {close_icon_color};
                 border: none;
                 border-radius: 6px;
                 font-size: 13px;
                 padding: 0px;
                 min-height: 0px;
-            }
-            QPushButton:hover {
-                background: #ef4444;
+            }}
+            QPushButton:hover {{
+                background: {c['danger']};
                 color: #ffffff;
-            }
+            }}
         """)
         close_btn.clicked.connect(self.accept)
         title_lay.addWidget(close_btn)
@@ -250,7 +261,7 @@ class ConfigureLayoutDialog(QDialog):
 
         # ── Content area ───────────────────────────────────────────────
         content = QWidget()
-        content.setStyleSheet("background: #1a1f2e; border: none;")
+        content.setStyleSheet(f"background: {body_bg}; border: none;")
         content_lay = QVBoxLayout(content)
         content_lay.setContentsMargins(20, 16, 20, 16)
         content_lay.setSpacing(14)
@@ -307,18 +318,24 @@ class ConfigureLayoutDialog(QDialog):
         self.close_btn.clicked.connect(self.accept)
 
     def _section_header(self, text):
+        c = self._c
+        header_color = "#818cf8" if self._is_dark else c['accent']
+        divider_color = ("rgba(255,255,255,0.08)" if self._is_dark
+                         else "rgba(0,0,0,0.08)")
         row = QHBoxLayout()
         row.setSpacing(8)
         label = QLabel(text)
         label.setStyleSheet(
-            "color: #818cf8; font-size: 10px; font-weight: 700; "
+            f"color: {header_color}; font-size: 10px; font-weight: 700; "
             "letter-spacing: 1.2px; background: transparent; border: none;"
         )
         row.addWidget(label)
         divider = QFrame()
         divider.setFrameShape(QFrame.Shape.HLine)
         divider.setFixedHeight(1)
-        divider.setStyleSheet("background-color: rgba(255,255,255,0.08); border: none;")
+        divider.setStyleSheet(
+            f"background-color: {divider_color}; border: none;"
+        )
         row.addWidget(divider, 1)
         return row
 
@@ -330,76 +347,86 @@ class ConfigureLayoutDialog(QDialog):
         return row
 
     def _field_cell(self, label_text, spin):
+        c = self._c
         col = QVBoxLayout()
         col.setSpacing(4)
         col.setContentsMargins(0, 0, 0, 0)
         lbl = QLabel(label_text)
         lbl.setStyleSheet(
-            "color: #94a3b8; font-size: 10px; font-weight: 500; "
-            "background: transparent; border: none;"
+            f"color: {c['text_secondary']}; font-size: 10px; "
+            "font-weight: 500; background: transparent; border: none;"
         )
         col.addWidget(lbl)
         col.addWidget(spin)
         return col
 
     def _make_spin(self):
+        c = self._c
+        input_border = ("rgba(255,255,255,0.12)" if self._is_dark
+                        else "rgba(0,0,0,0.14)")
         spin = QDoubleSpinBox()
         spin.setRange(0.0, 1.0)
         spin.setSingleStep(0.01)
         spin.setDecimals(3)
         spin.setFixedWidth(120)
-        spin.setStyleSheet("""
-            QDoubleSpinBox {
-                background: #1e2433;
-                color: #e2e8f0;
-                border: 1px solid rgba(255,255,255,0.12);
+        spin.setStyleSheet(f"""
+            QDoubleSpinBox {{
+                background: {c['bg_input']};
+                color: {c['text_primary']};
+                border: 1px solid {input_border};
                 border-radius: 6px;
                 padding: 6px 10px;
                 min-height: 0px;
                 font-size: 12px;
-            }
-            QDoubleSpinBox:focus {
-                border-color: #6366f1;
-            }
-            QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {
+            }}
+            QDoubleSpinBox:focus {{
+                border-color: {c['accent']};
+            }}
+            QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{
                 width: 0px;
                 border: none;
-            }
+            }}
         """)
         return spin
 
     def _outlined_button_style(self):
-        return """
-            QPushButton {
+        c = self._c
+        btn_border = ("rgba(255,255,255,0.20)" if self._is_dark
+                      else "rgba(0,0,0,0.18)")
+        hover_bg = ("rgba(255,255,255,0.06)" if self._is_dark
+                    else "rgba(0,0,0,0.05)")
+        return f"""
+            QPushButton {{
                 background: transparent;
-                color: #e2e8f0;
-                border: 1px solid rgba(255,255,255,0.2);
+                color: {c['text_primary']};
+                border: 1px solid {btn_border};
                 border-radius: 6px;
                 padding: 8px 16px;
                 font-size: 12px;
                 font-weight: 500;
                 min-height: 0px;
-            }
-            QPushButton:hover {
-                background: rgba(255,255,255,0.06);
-            }
+            }}
+            QPushButton:hover {{
+                background: {hover_bg};
+            }}
         """
 
     def _primary_button_style(self):
-        return """
-            QPushButton {
-                background: #6366f1;
-                color: #ffffff;
+        c = self._c
+        return f"""
+            QPushButton {{
+                background: {c['accent']};
+                color: {c['text_inverse']};
                 border: none;
                 border-radius: 6px;
                 padding: 8px 16px;
                 font-size: 12px;
                 font-weight: 600;
                 min-height: 0px;
-            }
-            QPushButton:hover {
-                background: #7c7ff3;
-            }
+            }}
+            QPushButton:hover {{
+                background: {c['accent_hover']};
+            }}
         """
 
     # ── Sync/actions ───────────────────────────────────────────────────

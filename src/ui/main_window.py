@@ -4,160 +4,192 @@ Main window for the DataLens application.
 
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget,
-    QApplication, QPushButton, QLabel, QFrame, QSizePolicy
+    QApplication, QLabel, QToolButton
 )
-from PyQt5.QtCore import Qt, QPoint, QSize, QSettings
-from PyQt5.QtGui import QPalette, QColor, QIcon, QFont, QCursor
+from PyQt5.QtCore import Qt, QSettings, QEvent, QPoint, QRect
+from PyQt5.QtGui import QIcon, QPixmap, QFont
 from .components.home_screen import HomeScreen
 from .components.workspace_view import WorkspaceView
 from .components import modal
-from .theme import apply_theme, get_colors
+from .theme import apply_theme
+from .dwm_helper import apply_modern_window_style, update_dwm_theme
+import ctypes
+import ctypes.wintypes
 import json
 import os
 import sys
 
 
-class _TitleBar(QWidget):
-    """Custom title bar that matches the dark theme."""
+# ---------------------------------------------------------------------------
+# Win32 constants used by the custom title bar (WM_NCCALCSIZE path)
+# ---------------------------------------------------------------------------
+WM_NCCALCSIZE = 0x0083
+WM_NCHITTEST = 0x0084
+WM_NCACTIVATE = 0x0086
 
-    def __init__(self, parent_window):
-        super().__init__(parent_window)
-        self._window = parent_window
-        self._drag_pos = None
-        self._is_maximized = False
-        self.setFixedHeight(42)
-        self.setObjectName("customTitleBar")
+HTCLIENT = 1
+HTCAPTION = 2
+HTLEFT = 10
+HTRIGHT = 11
+HTTOP = 12
+HTTOPLEFT = 13
+HTTOPRIGHT = 14
+HTBOTTOM = 15
+HTBOTTOMLEFT = 16
+HTBOTTOMRIGHT = 17
 
-        c = get_colors("dark")
+SM_CXFRAME = 32
+SM_CYFRAME = 33
+SM_CXPADDEDBORDER = 92
 
-        self.setStyleSheet(f"""
-            QWidget#customTitleBar {{
-                background-color: {c['bg_base']};
-                border-bottom: 1px solid {c['border']};
-            }}
-        """)
+
+class _RECT(ctypes.Structure):
+    _fields_ = [
+        ("left", ctypes.c_long),
+        ("top", ctypes.c_long),
+        ("right", ctypes.c_long),
+        ("bottom", ctypes.c_long),
+    ]
+
+
+class _NCCALCSIZE_PARAMS(ctypes.Structure):
+    _fields_ = [
+        ("rgrc", _RECT * 3),
+        ("lppos", ctypes.c_void_p),
+    ]
+
+
+class NativeTitleBar(QWidget):
+    """
+    Custom title bar that is drawn inside the client area of a native
+    window. The window is NOT marked frameless — WM_NCCALCSIZE collapses
+    the non-client area in MainWindow.nativeEvent, and WM_NCHITTEST marks
+    this widget's background as HTCAPTION so Windows still handles drag,
+    double-click-to-maximize, Aero Snap, and window animations.
+    """
+
+    HEIGHT = 48
+
+    def __init__(self, main_window, theme="dark"):
+        super().__init__(main_window)
+        self._window = main_window
+        self._theme = theme
+        self.setFixedHeight(self.HEIGHT)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 0, 4, 0)
-        layout.setSpacing(8)
+        layout.setContentsMargins(16, 0, 0, 0)
+        layout.setSpacing(10)
 
-        # App icon
-        icon_path = parent_window._resource_path(os.path.join('assets', 'DataLens_Logo.png'))
-        if os.path.exists(icon_path):
-            from PyQt5.QtGui import QPixmap
-            icon_label = QLabel()
-            pixmap = QPixmap(icon_path)
+        # Logo — large and prominent
+        self.logo_label = QLabel()
+        logo_path = main_window._resource_path(
+            os.path.join('assets', 'DataLens_Logo_cropped.png')
+        )
+        if os.path.exists(logo_path):
+            pixmap = QPixmap(logo_path)
             scaled = pixmap.scaledToHeight(30, Qt.SmoothTransformation)
-            icon_label.setPixmap(scaled)
-            icon_label.setStyleSheet("background: transparent; border: none; margin-right: 4px;")
-            layout.addWidget(icon_label)
+            self.logo_label.setPixmap(scaled)
+        self.logo_label.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        layout.addWidget(self.logo_label)
 
-        # Title text
-        title_label = QLabel("DataLens")
-        title_label.setStyleSheet(f"""
-            QLabel {{
-                color: #ffffff;
-                font-size: 14px;
-                font-weight: 600;
-                background: transparent;
-                border: none;
-            }}
-        """)
-        layout.addWidget(title_label)
+        # "DataLens" title — prominent, 12pt DemiBold
+        self.title_label = QLabel("DataLens")
+        title_font = QFont()
+        title_font.setPointSize(12)
+        title_font.setWeight(QFont.DemiBold)
+        self.title_label.setFont(title_font)
+        self.title_label.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        layout.addWidget(self.title_label)
 
         layout.addStretch()
 
-        # Window control buttons
-        btn_style_base = f"""
-            QPushButton {{
-                background-color: transparent;
-                color: {c['text_secondary']};
-                border: none;
-                border-radius: 0px;
-                font-size: 13px;
-                padding: 0px;
-                min-height: 0px;
-                min-width: 46px;
-                max-width: 46px;
-                max-height: 42px;
-            }}
-            QPushButton:hover {{
-                background-color: rgba(255,255,255,0.1);
-                color: {c['text_primary']};
-            }}
-        """
-        close_btn_style = f"""
-            QPushButton {{
-                background-color: transparent;
-                color: {c['text_secondary']};
-                border: none;
-                border-radius: 0px;
-                font-size: 13px;
-                padding: 0px;
-                min-height: 0px;
-                min-width: 46px;
-                max-width: 46px;
-                max-height: 42px;
-            }}
-            QPushButton:hover {{
-                background-color: #ef4444;
-                color: #ffffff;
-            }}
-        """
+        # Window-control buttons — narrow (40px) and native-looking
+        self.min_btn = QToolButton()
+        self.min_btn.setText("\u2013")      # en dash
+        self.max_btn = QToolButton()
+        self.max_btn.setText("\u25A1")      # □
+        self.close_btn = QToolButton()
+        self.close_btn.setText("\u2715")    # ✕
 
-        self.min_btn = QPushButton("─")
-        self.min_btn.setStyleSheet(btn_style_base)
-        self.min_btn.setFixedSize(46, 42)
-        self.min_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        self.min_btn.clicked.connect(self._window.showMinimized)
-        layout.addWidget(self.min_btn)
+        for btn in (self.min_btn, self.max_btn, self.close_btn):
+            btn.setFixedSize(40, self.HEIGHT)
+            btn.setFocusPolicy(Qt.NoFocus)
+            btn.setCursor(Qt.ArrowCursor)
+            layout.addWidget(btn)
 
-        self.max_btn = QPushButton("□")
-        self.max_btn.setStyleSheet(btn_style_base)
-        self.max_btn.setFixedSize(46, 42)
-        self.max_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        self.max_btn.clicked.connect(self._toggle_maximize)
-        layout.addWidget(self.max_btn)
+        self.min_btn.clicked.connect(main_window.showMinimized)
+        self.max_btn.clicked.connect(self._toggle_max)
+        self.close_btn.clicked.connect(main_window.close)
 
-        self.close_btn = QPushButton("✕")
-        self.close_btn.setStyleSheet(close_btn_style)
-        self.close_btn.setFixedSize(46, 42)
-        self.close_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        self.close_btn.clicked.connect(self._window.close)
-        layout.addWidget(self.close_btn)
+        self.apply_theme(theme)
 
-    def _toggle_maximize(self):
+    def _toggle_max(self):
         if self._window.isMaximized():
             self._window.showNormal()
-            self.max_btn.setText("□")
         else:
             self._window.showMaximized()
-            self.max_btn.setText("❐")
 
-    def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self._drag_pos = event.globalPos() - self._window.frameGeometry().topLeft()
-            event.accept()
+    def update_max_icon(self):
+        if self._window.isMaximized():
+            self.max_btn.setText("\u2752")  # restore glyph
+        else:
+            self.max_btn.setText("\u25A1")
 
-    def mouseMoveEvent(self, event):
-        if self._drag_pos is not None and event.buttons() == Qt.LeftButton:
-            if self._window.isMaximized():
-                # Un-maximize and reposition so the cursor stays proportional
-                old_width = self._window.width()
-                self._window.showNormal()
-                new_width = self._window.width()
-                ratio = event.globalPos().x() / old_width
-                self._drag_pos = QPoint(int(new_width * ratio), event.pos().y())
-                self.max_btn.setText("□")
-            self._window.move(event.globalPos() - self._drag_pos)
-            event.accept()
+    def button_rects(self):
+        """Return the button rects in this widget's local coordinate
+        system, used by WM_NCHITTEST to avoid marking button pixels as
+        HTCAPTION."""
+        return (
+            self.min_btn.geometry(),
+            self.max_btn.geometry(),
+            self.close_btn.geometry(),
+        )
 
-    def mouseReleaseEvent(self, event):
-        self._drag_pos = None
+    def apply_theme(self, theme):
+        self._theme = theme
+        if theme == "dark":
+            bg = "#0f1117"
+            text = "#ffffff"
+            btn_hover = "rgba(255,255,255,0.10)"
+        else:
+            bg = "#e8eaf0"
+            text = "#0f172a"
+            btn_hover = "rgba(0,0,0,0.08)"
 
-    def mouseDoubleClickEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self._toggle_maximize()
+        self.setStyleSheet(
+            f"NativeTitleBar {{ background-color: {bg}; }}"
+        )
+        self.title_label.setStyleSheet(
+            f"color: {text}; background: transparent;"
+        )
+        self.logo_label.setStyleSheet("background: transparent;")
+
+        btn_style = f"""
+            QToolButton {{
+                border: none;
+                color: {text};
+                background: transparent;
+                font-size: 11pt;
+            }}
+            QToolButton:hover {{
+                background-color: {btn_hover};
+            }}
+        """
+        close_style = f"""
+            QToolButton {{
+                border: none;
+                color: {text};
+                background: transparent;
+                font-size: 11pt;
+            }}
+            QToolButton:hover {{
+                background-color: #e81123;
+                color: white;
+            }}
+        """
+        self.min_btn.setStyleSheet(btn_style)
+        self.max_btn.setStyleSheet(btn_style)
+        self.close_btn.setStyleSheet(close_style)
 
 
 class MainWindow(QMainWindow):
@@ -168,7 +200,6 @@ class MainWindow(QMainWindow):
         super().__init__()
         self._settings = QSettings()
         self.current_theme = self._load_theme()
-        self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
         self.init_ui()
         self.setup_connections()
 
@@ -205,8 +236,10 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Custom title bar
-        self.title_bar = _TitleBar(self)
+        # Custom native title bar (inside the client area — window is
+        # NOT marked frameless; WM_NCCALCSIZE collapses the non-client
+        # area and WM_NCHITTEST marks this widget as HTCAPTION).
+        self.title_bar = NativeTitleBar(self, theme=self.current_theme)
         layout.addWidget(self.title_bar)
 
         self.stacked_widget = QStackedWidget()
@@ -222,7 +255,6 @@ class MainWindow(QMainWindow):
         # Apply the centralized theme
         apply_theme(self.current_theme)
         self.workspace_view.update_theme(self.current_theme)
-        self._apply_titlebar_theme(self.current_theme)
 
     def setup_connections(self):
         """Setup signal connections."""
@@ -252,18 +284,104 @@ class MainWindow(QMainWindow):
         self.current_theme = theme
         apply_theme(theme)
         self.workspace_view.update_theme(theme)
-        self._apply_titlebar_theme(theme)
+        self.title_bar.apply_theme(theme)
+        hwnd = int(self.winId())
+        update_dwm_theme(hwnd, theme)
         self._settings.setValue("theme", theme)
 
-    def _apply_titlebar_theme(self, theme):
-        """Refresh title bar styling for the given theme."""
-        c = get_colors(theme)
-        self.title_bar.setStyleSheet(f"""
-            QWidget#customTitleBar {{
-                background-color: {c['bg_base']};
-                border-bottom: 1px solid {c['border']};
-            }}
-        """)
+    def showEvent(self, event):
+        """Apply Windows 11 DWM styling once the window handle is valid."""
+        super().showEvent(event)
+        if not getattr(self, '_dwm_applied', False):
+            self._dwm_applied = True
+            hwnd = int(self.winId())
+            apply_modern_window_style(hwnd, self.current_theme)
+
+    def changeEvent(self, event):
+        """Keep the max/restore button glyph in sync with window state."""
+        if event.type() == QEvent.WindowStateChange:
+            if hasattr(self, 'title_bar'):
+                self.title_bar.update_max_icon()
+        super().changeEvent(event)
+
+    # ------------------------------------------------------------------
+    # Native Windows message handling for the custom title bar
+    # ------------------------------------------------------------------
+    def nativeEvent(self, eventType, message):
+        if eventType != "windows_generic_MSG" or sys.platform != "win32":
+            return False, 0
+
+        try:
+            msg = ctypes.wintypes.MSG.from_address(int(message))
+        except Exception:
+            return False, 0
+
+        # --- WM_NCCALCSIZE: collapse the non-client area -------------
+        if msg.message == WM_NCCALCSIZE and msg.wParam:
+            params = _NCCALCSIZE_PARAMS.from_address(msg.lParam)
+            if self.isMaximized():
+                # When maximized, Windows sizes the window ~8px beyond
+                # the work area on every side. Inset so the title bar
+                # contents are not clipped off-screen.
+                user32 = ctypes.windll.user32
+                cx_frame = user32.GetSystemMetrics(SM_CXFRAME)
+                cy_frame = user32.GetSystemMetrics(SM_CYFRAME)
+                padded = user32.GetSystemMetrics(SM_CXPADDEDBORDER)
+                params.rgrc[0].left += cx_frame + padded
+                params.rgrc[0].right -= cx_frame + padded
+                params.rgrc[0].top += cy_frame + padded
+                params.rgrc[0].bottom -= cy_frame + padded
+            # Returning 0 (with the rect unchanged, apart from the
+            # maximized inset above) tells Windows the entire proposed
+            # window rect is the client rect — i.e. no non-client area.
+            return True, 0
+
+        # --- WM_NCHITTEST: classify the point under the cursor -------
+        if msg.message == WM_NCHITTEST:
+            x = ctypes.c_short(msg.lParam & 0xFFFF).value
+            y = ctypes.c_short((msg.lParam >> 16) & 0xFFFF).value
+            local = self.mapFromGlobal(QPoint(x, y))
+            lx, ly = local.x(), local.y()
+            w, h = self.width(), self.height()
+            border = 6
+
+            if not self.isMaximized():
+                on_left = 0 <= lx < border
+                on_right = w - border <= lx < w
+                on_top = 0 <= ly < border
+                on_bottom = h - border <= ly < h
+
+                if on_top and on_left:
+                    return True, HTTOPLEFT
+                if on_top and on_right:
+                    return True, HTTOPRIGHT
+                if on_bottom and on_left:
+                    return True, HTBOTTOMLEFT
+                if on_bottom and on_right:
+                    return True, HTBOTTOMRIGHT
+                if on_top:
+                    return True, HTTOP
+                if on_bottom:
+                    return True, HTBOTTOM
+                if on_left:
+                    return True, HTLEFT
+                if on_right:
+                    return True, HTRIGHT
+
+            # Title bar region
+            if hasattr(self, 'title_bar') and 0 <= ly < self.title_bar.height():
+                tb_local = self.title_bar.mapFromGlobal(QPoint(x, y))
+                for rect in self.title_bar.button_rects():
+                    if rect.contains(tb_local):
+                        # Let Qt route clicks to the QToolButton.
+                        return True, HTCLIENT
+                return True, HTCAPTION
+
+            # Anywhere else — regular client area (Qt handles it).
+            return True, HTCLIENT
+
+        # Let Qt handle everything else
+        return False, 0
 
     def show_error(self, message):
         """Show error message dialog."""

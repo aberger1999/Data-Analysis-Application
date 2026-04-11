@@ -613,8 +613,8 @@ class ThemeToggle(QWidget):
         self.light_btn = QPushButton("☀ Light")
         for btn in (self.dark_btn, self.light_btn):
             btn.setCursor(Qt.PointingHandCursor)
-            btn.setFixedHeight(32)
-            btn.setMinimumWidth(78)
+            btn.setFixedHeight(40)
+            btn.setMinimumWidth(92)
 
         self.dark_btn.clicked.connect(lambda: self._select("dark"))
         self.light_btn.clicked.connect(lambda: self._select("light"))
@@ -622,7 +622,7 @@ class ThemeToggle(QWidget):
         layout.addWidget(self.dark_btn)
         layout.addWidget(self.light_btn)
 
-        self.setFixedWidth(160)
+        self.setFixedWidth(192)
         self._refresh_styles()
 
     def _select(self, theme):
@@ -645,12 +645,12 @@ class ThemeToggle(QWidget):
                     background-color: {c['accent']};
                     color: {c['text_inverse']};
                     border: 1px solid {c['accent']};
-                    border-radius: 14px;
-                    padding: 4px 12px;
-                    font-size: 12px;
+                    border-radius: 18px;
+                    padding: 6px 16px;
+                    font-size: 14px;
                     font-weight: 600;
-                    min-height: 28px;
-                    max-height: 28px;
+                    min-height: 36px;
+                    max-height: 36px;
                 }}
                 QPushButton:hover {{
                     background-color: {c['accent_hover']};
@@ -661,12 +661,12 @@ class ThemeToggle(QWidget):
                 background-color: {c['bg_tertiary']};
                 color: {c['text_secondary']};
                 border: 1px solid {c['border']};
-                border-radius: 14px;
-                padding: 4px 12px;
-                font-size: 12px;
+                border-radius: 18px;
+                padding: 6px 16px;
+                font-size: 14px;
                 font-weight: 600;
-                min-height: 28px;
-                max-height: 28px;
+                min-height: 36px;
+                max-height: 36px;
             }}
             QPushButton:hover {{
                 background-color: {c['bg_hover']};
@@ -741,7 +741,7 @@ class HomeScreen(QWidget):
         # Content area with padding
         content_widget = QWidget()
         layout = QVBoxLayout(content_widget)
-        layout.setContentsMargins(48, 40, 48, 0)
+        layout.setContentsMargins(48, 20, 48, 0)
         layout.setSpacing(24)
 
         # Header
@@ -751,7 +751,9 @@ class HomeScreen(QWidget):
         title_layout.setSpacing(4)
 
         # Title row: logo + "DataLens" inline
-        title_row = QHBoxLayout()
+        title_row_widget = QWidget()
+        title_row_widget.setMinimumHeight(80)
+        title_row = QHBoxLayout(title_row_widget)
         title_row.setSpacing(0)
         title_row.setContentsMargins(0, 0, 0, 0)
 
@@ -767,7 +769,7 @@ class HomeScreen(QWidget):
             from PyQt5.QtGui import QPixmap
             logo_label = QLabel()
             pixmap = QPixmap(logo_path)
-            scaled = pixmap.scaledToHeight(52, Qt.SmoothTransformation)
+            scaled = pixmap.scaledToHeight(64, Qt.SmoothTransformation)
             logo_label.setPixmap(scaled)
             logo_label.setStyleSheet("background: transparent; border: none; margin-right: 8px;")
             title_row.addWidget(logo_label)
@@ -777,7 +779,7 @@ class HomeScreen(QWidget):
         self.title_label.setStyleSheet(f"""
             QLabel {{
                 color: {_title_color};
-                font-size: 32px;
+                font-size: 28pt;
                 font-weight: 700;
                 letter-spacing: -0.5px;
                 background: transparent;
@@ -786,11 +788,11 @@ class HomeScreen(QWidget):
         """)
         title_row.addWidget(self.title_label)
         title_row.addStretch()
-        title_layout.addLayout(title_row)
+        title_layout.addWidget(title_row_widget)
 
         self.subtitle_label = QLabel("Your data. Clearer than ever.")
         sub_color = "#94a3b8" if self.current_theme == "dark" else "#475569"
-        self.subtitle_label.setStyleSheet(f"color: {sub_color}; font-size: 14px; font-weight: 400; background: transparent;")
+        self.subtitle_label.setStyleSheet(f"color: {sub_color}; font-size: 13pt; font-weight: 400; background: transparent;")
         title_layout.addWidget(self.subtitle_label)
 
         header_layout.addLayout(title_layout)
@@ -863,7 +865,7 @@ class HomeScreen(QWidget):
         self.title_label.setStyleSheet(f"""
             QLabel {{
                 color: {title_color};
-                font-size: 32px;
+                font-size: 28pt;
                 font-weight: 700;
                 letter-spacing: -0.5px;
                 background: transparent;
@@ -871,7 +873,7 @@ class HomeScreen(QWidget):
             }}
         """)
         sub_color = "#94a3b8" if self.current_theme == "dark" else "#475569"
-        self.subtitle_label.setStyleSheet(f"color: {sub_color}; font-size: 14px; font-weight: 400; background: transparent;")
+        self.subtitle_label.setStyleSheet(f"color: {sub_color}; font-size: 13pt; font-weight: 400; background: transparent;")
         self.separator.setStyleSheet(f"background-color: {c['border']};")
 
         self.footer_frame.setStyleSheet(f"""

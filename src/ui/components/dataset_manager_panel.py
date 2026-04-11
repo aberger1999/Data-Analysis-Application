@@ -416,7 +416,7 @@ class _TitleBar(QWidget):
 class DatasetManagerDialog(QDialog):
     """Two-column dataset manager with originals and working copies."""
 
-    dataset_selected = pyqtSignal(str)   # full file path
+    dataset_activated = pyqtSignal(str)  # workspace-relative path (originals/ or copies/)
     dataset_deleted = pyqtSignal(str)    # relative path
     dataset_renamed = pyqtSignal(str, str)
     workspace_reset = pyqtSignal()       # emitted after full reset
@@ -742,11 +742,19 @@ class DatasetManagerDialog(QDialog):
 
     def refresh(self):
         """Rebuild both columns from data_manager state."""
+        if self.data_manager and self.workspace_path:
+            self.data_manager.validate_metadata()
         self._refresh_left()
         self._refresh_right()
 
     def _refresh_left(self):
-        """Rebuild the originals column."""
+        """Rebuild the originals column.
+
+        Only files actually present in ``data/originals/`` (or recorded
+        in metadata as a known original) appear here. A copy file
+        sitting in ``data/copies/`` will never be rendered in this
+        column even if a stale metadata entry tried to claim otherwise.
+        """
         while self.left_layout.count() > 1:
             item = self.left_layout.takeAt(0)
             w = item.widget()
@@ -758,6 +766,7 @@ class DatasetManagerDialog(QDialog):
             return
 
         originals = self.data_manager.get_originals()
+        originals_dir = self.data_manager._originals_folder()
 
         if not originals:
             self._show_left_empty(True)
@@ -767,8 +776,12 @@ class DatasetManagerDialog(QDialog):
 
         first_original = None
         for filename, info in originals.items():
+            # Safeguard: an original is only valid if its file lives in
+            # data/originals/ — never in data/copies/.
             orig_rel = info.get('path', f"originals/{filename}")
-            file_path = self.data_manager._resolve_data_path(orig_rel)
+            if not orig_rel.startswith("originals/"):
+                continue
+            file_path = os.path.join(originals_dir, filename)
             imported_at = info.get('imported_at')
             missing = not os.path.isfile(file_path)
             card = OriginalCard(filename, file_path, imported_at, missing)
@@ -787,7 +800,14 @@ class DatasetManagerDialog(QDialog):
         self._highlight_selected_original()
 
     def _refresh_right(self):
-        """Rebuild the working copies column for the selected original."""
+        """Rebuild the working copies column for the selected original.
+
+        Working copies are sourced from ``data/copies/`` only — entries
+        whose underlying file is missing from that folder are skipped
+        entirely. Any copies that the validation pass could not match
+        to a parent original are appended in an "Unassigned Copies"
+        section at the bottom.
+        """
         while self.right_layout.count() > 1:
             item = self.right_layout.takeAt(0)
             w = item.widget()
@@ -799,14 +819,19 @@ class DatasetManagerDialog(QDialog):
             self._show_right_empty(False)
             self.guidance_banner.hide()
             self.load_original_btn.hide()
+            self._append_unassigned_copies()
             return
 
         orig_base = os.path.splitext(self._selected_original)[0]
         self.right_sub_header.setText(f"Copies of: {orig_base}")
 
-        copies = self.data_manager.get_copies_for_original(self._selected_original)
+        copies = [
+            c for c in self.data_manager.get_copies_for_original(self._selected_original)
+            if c.startswith("copies/")
+        ]
+        unassigned = self.data_manager.get_unassigned_copies()
 
-        if not copies:
+        if not copies and not unassigned:
             self._show_right_empty(True)
             self.guidance_banner.show()
             self.load_original_btn.show()
@@ -818,9 +843,40 @@ class DatasetManagerDialog(QDialog):
 
         for copy_rel in copies:
             file_path = self.data_manager._resolve_data_path(copy_rel)
-            missing = not os.path.isfile(file_path)
+            if not os.path.isfile(file_path):
+                continue
             is_active = (copy_rel == self.current_dataset)
-            card = CopyCard(copy_rel, file_path, is_active, missing)
+            card = CopyCard(copy_rel, file_path, is_active, False)
+            card.load_clicked.connect(self._on_load_copy)
+            card.rename_clicked.connect(self._on_rename_copy)
+            card.delete_clicked.connect(self._on_delete_copy)
+            self.right_layout.insertWidget(self.right_layout.count() - 1, card)
+
+        self._append_unassigned_copies()
+
+    def _append_unassigned_copies(self):
+        """Render an Unassigned Copies sub-section if any orphan copies exist."""
+        if not self.data_manager:
+            return
+        unassigned = self.data_manager.get_unassigned_copies()
+        if not unassigned:
+            return
+
+        c = _colors()
+        header = QLabel("UNASSIGNED COPIES")
+        header.setStyleSheet(
+            f"color: {c['text_secondary']}; font-size: 9px; font-weight: 700; "
+            f"letter-spacing: 1.2px; background: transparent; border: none; "
+            f"padding-top: 6px;"
+        )
+        self.right_layout.insertWidget(self.right_layout.count() - 1, header)
+
+        for copy_rel in unassigned:
+            file_path = self.data_manager._resolve_data_path(copy_rel)
+            if not os.path.isfile(file_path):
+                continue
+            is_active = (copy_rel == self.current_dataset)
+            card = CopyCard(copy_rel, file_path, is_active, False)
             card.load_clicked.connect(self._on_load_copy)
             card.rename_clicked.connect(self._on_rename_copy)
             card.delete_clicked.connect(self._on_delete_copy)
@@ -842,30 +898,41 @@ class DatasetManagerDialog(QDialog):
 
     def _highlight_selected_original(self):
         c = _colors()
+        active_original = self._active_original_filename()
         for i in range(self.left_layout.count()):
             item = self.left_layout.itemAt(i)
             w = item.widget()
-            if isinstance(w, OriginalCard):
-                if w.filename == self._selected_original:
-                    w.setStyleSheet(f"""
-                        OriginalCard {{
-                            background: {c['bg_tertiary']};
-                            border: 1px solid {c['accent']};
-                            border-radius: 6px;
-                        }}
-                    """)
-                else:
-                    border = "rgba(245,158,11,0.5)" if w.missing else c['border']
-                    w.setStyleSheet(f"""
-                        OriginalCard {{
-                            background: {c['bg_input']};
-                            border: 1px solid {border};
-                            border-radius: 6px;
-                        }}
-                        OriginalCard:hover {{
-                            border-color: {c['border_medium']};
-                        }}
-                    """)
+            if not isinstance(w, OriginalCard):
+                continue
+            is_selected = (w.filename == self._selected_original)
+            is_active = (w.filename == active_original)
+            border_color = c['accent'] if is_selected else (
+                "rgba(245,158,11,0.5)" if w.missing else c['border']
+            )
+            background = c['bg_tertiary'] if is_selected else c['bg_input']
+            left_border_rule = (
+                f"border-left: 3px solid {c['accent']};" if is_active else ""
+            )
+            hover_rule = "" if is_selected else (
+                f"OriginalCard:hover {{ border-color: {c['border_medium']}; }}"
+            )
+            w.setStyleSheet(f"""
+                OriginalCard {{
+                    background: {background};
+                    border: 1px solid {border_color};
+                    border-radius: 6px;
+                    {left_border_rule}
+                }}
+                {hover_rule}
+            """)
+
+    def _active_original_filename(self):
+        """Return the original filename whose copy (or itself) is currently active."""
+        if not self.data_manager or not self.current_dataset:
+            return None
+        if self.current_dataset.startswith("originals/"):
+            return os.path.basename(self.current_dataset)
+        return self.data_manager.get_original_for_copy(self.current_dataset)
 
     # ── Actions ────────────────────────────────────────────────────────────
 
@@ -917,8 +984,10 @@ class DatasetManagerDialog(QDialog):
     def _on_load_copy(self, copy_rel_path):
         if not self.data_manager or not self.workspace_path:
             return
-        file_path = self.data_manager._resolve_data_path(copy_rel_path)
-        self.dataset_selected.emit(file_path)
+        # Loading a working copy must NEVER take the import code path —
+        # we only switch the active_working_copy pointer and load its
+        # data into the session.
+        self.dataset_activated.emit(copy_rel_path)
         self.current_dataset = copy_rel_path
         self.refresh()
 
@@ -933,8 +1002,7 @@ class DatasetManagerDialog(QDialog):
             return
 
         orig_rel = f"originals/{self._selected_original}"
-        file_path = self.data_manager._resolve_data_path(orig_rel)
-        self.dataset_selected.emit(file_path)
+        self.dataset_activated.emit(orig_rel)
         self.current_dataset = orig_rel
         self.refresh()
 
@@ -964,8 +1032,7 @@ class DatasetManagerDialog(QDialog):
             return
 
         orig_rel = f"originals/{original_filename}"
-        file_path = self.data_manager._resolve_data_path(orig_rel)
-        self.dataset_selected.emit(file_path)
+        self.dataset_activated.emit(orig_rel)
         self.current_dataset = orig_rel
         self.refresh()
 

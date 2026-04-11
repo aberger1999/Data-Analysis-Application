@@ -245,8 +245,14 @@ class WorkspaceView(QWidget):
                     f"Error saving data: {str(e)}"
                 )
     
-    def load_dataset_from_manager(self, file_path):
-        """Load a dataset selected from the dataset manager."""
+    def activate_dataset_from_manager(self, relative_path):
+        """Activate a workspace-internal dataset (original or working copy).
+
+        Loads the file via ``DataManager.activate_dataset`` so that the
+        active_working_copy pointer is the only thing that changes —
+        the file is never re-imported and never re-registered as a new
+        original.
+        """
         if self.has_unsaved_changes:
             result = modal.show_question_3way(
                 self,
@@ -259,7 +265,7 @@ class WorkspaceView(QWidget):
             elif result == "yes":
                 self.save_workspace()
 
-        self.data_manager.load_csv(file_path)
+        self.data_manager.activate_dataset(relative_path)
         self.has_unsaved_changes = False
         self.update_save_button()
 
@@ -288,7 +294,7 @@ class WorkspaceView(QWidget):
     def show_dataset_manager(self):
         """Show the dataset manager dialog."""
         self.dataset_manager_dialog = DatasetManagerDialog(self)
-        self.dataset_manager_dialog.dataset_selected.connect(self.load_dataset_from_manager)
+        self.dataset_manager_dialog.dataset_activated.connect(self.activate_dataset_from_manager)
         self.dataset_manager_dialog.dataset_deleted.connect(self.on_dataset_deleted)
         self.dataset_manager_dialog.dataset_renamed.connect(self.on_dataset_renamed)
         self.dataset_manager_dialog.workspace_reset.connect(self.on_workspace_reset)

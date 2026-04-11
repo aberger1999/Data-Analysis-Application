@@ -11,6 +11,41 @@ import numpy as np
 from PyQt5.QtCore import QObject, pyqtSignal, QTimer
 from scipy import stats
 
+
+def sanitize_basename(name: str) -> str:
+    """Normalize a filename base for use in copy filenames.
+
+    Strips the extension, trims leading/trailing underscores or spaces,
+    and collapses internal underscore runs to a single underscore so
+    that joining sanitized parts with '_' never produces double
+    underscores.
+    """
+    base = os.path.splitext(name)[0]
+    base = base.strip('_ ')
+    base = re.sub(r'_+', '_', base)
+    return base
+
+
+def get_next_copy_name(workspace_name, original_filename, copies_dir):
+    """Return the next numbered copy filename for an original.
+
+    The first copy is always ``..._1.csv`` (never unnumbered) and
+    subsequent copies increment the trailing number. Both the workspace
+    name and the original filename are sanitized first to avoid double
+    underscore artefacts.
+    """
+    workspace_clean = sanitize_basename(workspace_name) if workspace_name else "workspace"
+    file_clean = sanitize_basename(original_filename)
+    base = f"{workspace_clean}_{file_clean}"
+
+    counter = 1
+    while True:
+        candidate = f"{base}_{counter}.csv"
+        if not os.path.exists(os.path.join(copies_dir, candidate)):
+            return candidate
+        counter += 1
+
+
 class DataManager(QObject):
     """Manages data operations and storage for the application."""
 
@@ -29,6 +64,7 @@ class DataManager(QObject):
         self.workspace_name = ""
         self._active_working_copy = None  # filename of the current working copy
         self._originals = {}  # {original_filename: {"imported_at": str, "copies": [str]}}
+        self._unassigned_copies = []  # copy rel paths found on disk with no parent original
 
     def clear_data(self):
         """Clear the current data."""
@@ -37,6 +73,7 @@ class DataManager(QObject):
         self.redo_stack = []
         self._active_working_copy = None
         self._originals = {}
+        self._unassigned_copies = []
         self.data_loaded.emit(pd.DataFrame())
 
     @property
@@ -84,14 +121,14 @@ class DataManager(QObject):
         """Check whether a file path is anywhere under the workspace data tree."""
         if not self.workspace_path:
             return False
-        data_folder = os.path.normpath(os.path.join(self.workspace_path, "data"))
+        data_folder = os.path.normpath(os.path.abspath(os.path.join(self.workspace_path, "data")))
         abs_path = os.path.normpath(os.path.abspath(file_path))
         return abs_path.startswith(data_folder + os.sep) or abs_path.startswith(data_folder + "/")
 
     def _rel_path_for(self, abs_path):
         """Get the data-relative path (forward-slash separated) for an absolute path."""
-        data_folder = os.path.join(self.workspace_path, "data")
-        return os.path.relpath(abs_path, data_folder).replace("\\", "/")
+        data_folder = os.path.abspath(os.path.join(self.workspace_path, "data"))
+        return os.path.relpath(os.path.abspath(abs_path), data_folder).replace("\\", "/")
 
     # ── Migration ──────────────────────────────────────────────────────────
 
@@ -177,29 +214,9 @@ class DataManager(QObject):
     # ── Working-copy naming ────────────────────────────────────────────────
 
     def _generate_working_copy_name(self, original_filename):
-        """Generate a unique working copy filename: {Workspace}_{OriginalBase}."""
-        base, ext = os.path.splitext(original_filename)
-        ext = ext or '.csv'
-
-        ws_part = self._sanitize_name(self.workspace_name) if self.workspace_name else "workspace"
-        file_part = self._sanitize_name(base)
-
-        # Avoid doubling the workspace prefix when the original already starts with it
-        if file_part.startswith(ws_part + "_"):
-            file_part = file_part[len(ws_part) + 1:]
-
-        candidate = f"{ws_part}_{file_part}{ext}"
-        copies_dir = self._copies_folder()
-
-        if not os.path.exists(os.path.join(copies_dir, candidate)):
-            return candidate
-
-        n = 2
-        while True:
-            candidate = f"{ws_part}_{file_part}_{n}{ext}"
-            if not os.path.exists(os.path.join(copies_dir, candidate)):
-                return candidate
-            n += 1
+        """Generate a unique working copy filename: {Workspace}_{OriginalBase}_{N}.csv."""
+        self._ensure_data_folders()
+        return get_next_copy_name(self.workspace_name, original_filename, self._copies_folder())
 
     # ── Metadata persistence ───────────────────────────────────────────────
 
@@ -230,6 +247,114 @@ class DataManager(QObject):
             self._originals = metadata.get('originals', {})
         except Exception:
             self._originals = {}
+
+    def validate_metadata(self):
+        """Reconcile metadata.json against the actual originals/ and copies/ folders.
+
+        - Drops copy entries whose files no longer exist on disk.
+        - Keeps original entries even when the file is missing (so the
+          UI can render a warning indicator).
+        - Auto-registers any CSV in originals/ that is not in metadata.
+        - Auto-registers any CSV in copies/ that is not listed under
+          any original by matching the filename pattern; copies that
+          cannot be matched are exposed via ``get_unassigned_copies()``.
+        """
+        if not self.workspace_path:
+            return
+
+        self._ensure_data_folders()
+        originals_dir = self._originals_folder()
+        copies_dir = self._copies_folder()
+
+        # 1. Drop missing copy entries from metadata.
+        for orig_name, info in list(self._originals.items()):
+            kept = []
+            for copy_rel in info.get('copies', []):
+                copy_abs = self._resolve_data_path(copy_rel)
+                if os.path.isfile(copy_abs):
+                    kept.append(copy_rel)
+            info['copies'] = kept
+
+        # 2. Register orphan originals (files in originals/ not in metadata).
+        try:
+            on_disk_originals = [
+                f for f in os.listdir(originals_dir)
+                if os.path.isfile(os.path.join(originals_dir, f)) and f.lower().endswith('.csv')
+            ]
+        except OSError:
+            on_disk_originals = []
+
+        from datetime import datetime
+        for fname in on_disk_originals:
+            if fname not in self._originals:
+                ts = datetime.fromtimestamp(
+                    os.path.getmtime(os.path.join(originals_dir, fname))
+                ).strftime('%Y-%m-%d %H:%M:%S')
+                self._originals[fname] = {
+                    'path': f"originals/{fname}",
+                    'imported_at': ts,
+                    'copies': [],
+                }
+
+        # 3. Match orphan copy files to a parent original by name pattern.
+        try:
+            on_disk_copies = [
+                f for f in os.listdir(copies_dir)
+                if os.path.isfile(os.path.join(copies_dir, f)) and f.lower().endswith('.csv')
+            ]
+        except OSError:
+            on_disk_copies = []
+
+        tracked = set()
+        for info in self._originals.values():
+            for copy_rel in info.get('copies', []):
+                tracked.add(os.path.basename(copy_rel))
+
+        ws_clean = sanitize_basename(self.workspace_name) if self.workspace_name else "workspace"
+        unassigned = []
+        for copy_basename in on_disk_copies:
+            if copy_basename in tracked:
+                continue
+
+            parent = self._guess_parent_original(copy_basename, ws_clean)
+            if parent is not None:
+                copy_rel = f"copies/{copy_basename}"
+                self._originals[parent].setdefault('copies', []).append(copy_rel)
+                tracked.add(copy_basename)
+            else:
+                unassigned.append(f"copies/{copy_basename}")
+
+        self._unassigned_copies = unassigned
+
+        self._update_metadata()
+
+    def _guess_parent_original(self, copy_basename, workspace_clean):
+        """Try to determine which original a free-floating copy belongs to.
+
+        Matches copies named ``{ws}_{file}_{N}.csv`` against each known
+        original's sanitized basename. Returns the original filename or
+        ``None`` if no match is found.
+        """
+        copy_root = sanitize_basename(copy_basename)
+        prefix = f"{workspace_clean}_"
+        if not copy_root.startswith(prefix):
+            return None
+        remainder = copy_root[len(prefix):]
+        # Strip a trailing _<digits> if present.
+        m = re.match(r'^(.*?)(?:_(\d+))?$', remainder)
+        if not m:
+            return None
+        candidate_root = m.group(1)
+        if not candidate_root:
+            return None
+        for orig_name in self._originals.keys():
+            if sanitize_basename(orig_name) == candidate_root:
+                return orig_name
+        return None
+
+    def get_unassigned_copies(self):
+        """Return the list of orphan copy relative paths discovered on disk."""
+        return list(self._unassigned_copies)
 
     # ── Query helpers ──────────────────────────────────────────────────────
 

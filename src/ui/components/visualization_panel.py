@@ -130,6 +130,338 @@ class FullScreenChartDialog(QDialog):
             self.close()
         super().keyPressEvent(event)
 
+
+class ConfigureLayoutDialog(QDialog):
+    """Custom dark-themed replacement for matplotlib's SubplotTool dialog.
+
+    Exposes the same six subplot parameters (top/bottom/left/right,
+    hspace, wspace), a Tight Layout shortcut and a Reset button. It
+    does not provide an Export Values action.
+    """
+
+    _DEFAULTS = {
+        'top': 0.91,
+        'bottom': 0.11,
+        'left': 0.125,
+        'right': 0.9,
+        'hspace': 0.2,
+        'wspace': 0.2,
+    }
+
+    def __init__(self, figure, canvas, parent=None):
+        super().__init__(parent)
+        self._figure = figure
+        self._canvas = canvas
+        self._initial = self._current_params()
+        self._drag_pos = None
+
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setModal(True)
+        self.setFixedWidth(360)
+
+        self._build_ui()
+        self._sync_inputs_from_figure()
+
+    # ── Figure helpers ─────────────────────────────────────────────────
+
+    def _current_params(self):
+        sp = self._figure.subplotpars
+        return {
+            'top': sp.top,
+            'bottom': sp.bottom,
+            'left': sp.left,
+            'right': sp.right,
+            'hspace': sp.hspace,
+            'wspace': sp.wspace,
+        }
+
+    def _apply_params(self, params):
+        self._figure.subplots_adjust(**params)
+        self._canvas.draw_idle()
+
+    # ── UI construction ────────────────────────────────────────────────
+
+    def _build_ui(self):
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        # Rounded container frame with border
+        self._frame = QFrame()
+        self._frame.setObjectName("configureLayoutFrame")
+        self._frame.setStyleSheet("""
+            QFrame#configureLayoutFrame {
+                background: #1a1f2e;
+                border: 1px solid rgba(255,255,255,0.1);
+                border-radius: 10px;
+            }
+        """)
+        outer.addWidget(self._frame)
+
+        body = QVBoxLayout(self._frame)
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(0)
+
+        # ── Custom title bar ───────────────────────────────────────────
+        self._title_bar = QWidget()
+        self._title_bar.setFixedHeight(36)
+        self._title_bar.setStyleSheet("""
+            QWidget {
+                background: #0f1117;
+                border-top-left-radius: 10px;
+                border-top-right-radius: 10px;
+                border: none;
+            }
+        """)
+        title_lay = QHBoxLayout(self._title_bar)
+        title_lay.setContentsMargins(14, 0, 6, 0)
+        title_lay.setSpacing(6)
+
+        title_label = QLabel("Configure Layout")
+        title_label.setStyleSheet(
+            "color: #ffffff; font-size: 13px; font-weight: 500; "
+            "background: transparent; border: none;"
+        )
+        title_lay.addWidget(title_label)
+        title_lay.addStretch()
+
+        close_btn = QPushButton("\u2715")
+        close_btn.setFixedSize(28, 28)
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                color: #cbd5e1;
+                border: none;
+                border-radius: 6px;
+                font-size: 13px;
+                padding: 0px;
+                min-height: 0px;
+            }
+            QPushButton:hover {
+                background: #ef4444;
+                color: #ffffff;
+            }
+        """)
+        close_btn.clicked.connect(self.accept)
+        title_lay.addWidget(close_btn)
+        body.addWidget(self._title_bar)
+
+        # ── Content area ───────────────────────────────────────────────
+        content = QWidget()
+        content.setStyleSheet("background: #1a1f2e; border: none;")
+        content_lay = QVBoxLayout(content)
+        content_lay.setContentsMargins(20, 16, 20, 16)
+        content_lay.setSpacing(14)
+
+        # Margins section
+        content_lay.addLayout(self._section_header("MARGINS"))
+        self.top_input = self._make_spin()
+        self.bottom_input = self._make_spin()
+        self.left_input = self._make_spin()
+        self.right_input = self._make_spin()
+        content_lay.addLayout(
+            self._two_field_row("Top", self.top_input, "Bottom", self.bottom_input)
+        )
+        content_lay.addLayout(
+            self._two_field_row("Left", self.left_input, "Right", self.right_input)
+        )
+
+        # Spacing section
+        content_lay.addSpacing(2)
+        content_lay.addLayout(self._section_header("SPACING"))
+        self.hspace_input = self._make_spin()
+        self.wspace_input = self._make_spin()
+        content_lay.addLayout(
+            self._two_field_row("H Space", self.hspace_input, "W Space", self.wspace_input)
+        )
+
+        # Button row
+        content_lay.addSpacing(6)
+        button_row = QHBoxLayout()
+        button_row.setSpacing(8)
+        self.tight_btn = QPushButton("Tight Layout")
+        self.reset_btn = QPushButton("Reset")
+        for btn in (self.tight_btn, self.reset_btn):
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setFixedHeight(34)
+            btn.setStyleSheet(self._outlined_button_style())
+            button_row.addWidget(btn, 1)
+        content_lay.addLayout(button_row)
+
+        self.close_btn = QPushButton("Close")
+        self.close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.close_btn.setFixedHeight(34)
+        self.close_btn.setStyleSheet(self._primary_button_style())
+        content_lay.addWidget(self.close_btn)
+
+        body.addWidget(content)
+
+        # Wire signals
+        for spin in (self.top_input, self.bottom_input, self.left_input,
+                     self.right_input, self.hspace_input, self.wspace_input):
+            spin.valueChanged.connect(self._on_value_changed)
+        self.tight_btn.clicked.connect(self._on_tight_layout)
+        self.reset_btn.clicked.connect(self._on_reset)
+        self.close_btn.clicked.connect(self.accept)
+
+    def _section_header(self, text):
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        label = QLabel(text)
+        label.setStyleSheet(
+            "color: #818cf8; font-size: 10px; font-weight: 700; "
+            "letter-spacing: 1.2px; background: transparent; border: none;"
+        )
+        row.addWidget(label)
+        divider = QFrame()
+        divider.setFrameShape(QFrame.Shape.HLine)
+        divider.setFixedHeight(1)
+        divider.setStyleSheet("background-color: rgba(255,255,255,0.08); border: none;")
+        row.addWidget(divider, 1)
+        return row
+
+    def _two_field_row(self, label_a, spin_a, label_b, spin_b):
+        row = QHBoxLayout()
+        row.setSpacing(10)
+        row.addLayout(self._field_cell(label_a, spin_a), 1)
+        row.addLayout(self._field_cell(label_b, spin_b), 1)
+        return row
+
+    def _field_cell(self, label_text, spin):
+        col = QVBoxLayout()
+        col.setSpacing(4)
+        col.setContentsMargins(0, 0, 0, 0)
+        lbl = QLabel(label_text)
+        lbl.setStyleSheet(
+            "color: #94a3b8; font-size: 10px; font-weight: 500; "
+            "background: transparent; border: none;"
+        )
+        col.addWidget(lbl)
+        col.addWidget(spin)
+        return col
+
+    def _make_spin(self):
+        spin = QDoubleSpinBox()
+        spin.setRange(0.0, 1.0)
+        spin.setSingleStep(0.01)
+        spin.setDecimals(3)
+        spin.setFixedWidth(120)
+        spin.setStyleSheet("""
+            QDoubleSpinBox {
+                background: #1e2433;
+                color: #e2e8f0;
+                border: 1px solid rgba(255,255,255,0.12);
+                border-radius: 6px;
+                padding: 6px 10px;
+                min-height: 0px;
+                font-size: 12px;
+            }
+            QDoubleSpinBox:focus {
+                border-color: #6366f1;
+            }
+            QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {
+                width: 0px;
+                border: none;
+            }
+        """)
+        return spin
+
+    def _outlined_button_style(self):
+        return """
+            QPushButton {
+                background: transparent;
+                color: #e2e8f0;
+                border: 1px solid rgba(255,255,255,0.2);
+                border-radius: 6px;
+                padding: 8px 16px;
+                font-size: 12px;
+                font-weight: 500;
+                min-height: 0px;
+            }
+            QPushButton:hover {
+                background: rgba(255,255,255,0.06);
+            }
+        """
+
+    def _primary_button_style(self):
+        return """
+            QPushButton {
+                background: #6366f1;
+                color: #ffffff;
+                border: none;
+                border-radius: 6px;
+                padding: 8px 16px;
+                font-size: 12px;
+                font-weight: 600;
+                min-height: 0px;
+            }
+            QPushButton:hover {
+                background: #7c7ff3;
+            }
+        """
+
+    # ── Sync/actions ───────────────────────────────────────────────────
+
+    def _sync_inputs_from_figure(self):
+        params = self._current_params()
+        mapping = (
+            (self.top_input, 'top'),
+            (self.bottom_input, 'bottom'),
+            (self.left_input, 'left'),
+            (self.right_input, 'right'),
+            (self.hspace_input, 'hspace'),
+            (self.wspace_input, 'wspace'),
+        )
+        for spin, key in mapping:
+            spin.blockSignals(True)
+            spin.setValue(params[key])
+            spin.blockSignals(False)
+
+    def _on_value_changed(self):
+        self._apply_params({
+            'top': self.top_input.value(),
+            'bottom': self.bottom_input.value(),
+            'left': self.left_input.value(),
+            'right': self.right_input.value(),
+            'hspace': self.hspace_input.value(),
+            'wspace': self.wspace_input.value(),
+        })
+
+    def _on_tight_layout(self):
+        try:
+            self._figure.tight_layout()
+        except Exception:
+            pass
+        self._canvas.draw_idle()
+        self._sync_inputs_from_figure()
+
+    def _on_reset(self):
+        self._apply_params(self._DEFAULTS)
+        self._sync_inputs_from_figure()
+
+    # ── Drag support ───────────────────────────────────────────────────
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton and self._title_bar.underMouse():
+            self._drag_pos = event.globalPos() - self.frameGeometry().topLeft()
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._drag_pos is not None and event.buttons() & Qt.MouseButton.LeftButton:
+            self.move(event.globalPos() - self._drag_pos)
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        self._drag_pos = None
+        super().mouseReleaseEvent(event)
+
+
 class VisualizationPanel(QWidget):
     """Panel for creating and customizing visualizations."""
 
@@ -563,6 +895,8 @@ class VisualizationPanel(QWidget):
         """)
         # Recolor toolbar icons for dark background
         self._recolor_toolbar_icons()
+        # Replace matplotlib's built-in Configure Subplots dialog with our custom one
+        self._install_configure_layout_override()
 
         toolbar_row.addWidget(self.toolbar, stretch=1)
 
@@ -737,6 +1071,35 @@ class VisualizationPanel(QWidget):
             p.fillRect(painted.rect(), target_color)
             p.end()
             action.setIcon(QIcon(painted))
+
+    def _install_configure_layout_override(self):
+        """Redirect matplotlib's Configure Subplots action to our custom dialog.
+
+        The built-in matplotlib ``SubplotTool`` dialog uses the OS window chrome
+        and exposes an Export Values button we do not want.  We locate the
+        corresponding toolbar action, disconnect its default handler, and wire
+        it to :class:`ConfigureLayoutDialog` instead.
+        """
+        target = None
+        for action in self.toolbar.actions():
+            text = (action.text() or "").lower()
+            tip = (action.toolTip() or "").lower()
+            if "subplot" in text or "subplot" in tip or "configure" in tip:
+                target = action
+                break
+        if target is None:
+            return
+        try:
+            target.triggered.disconnect()
+        except TypeError:
+            pass
+        target.triggered.connect(self._open_configure_layout)
+        target.setToolTip("Configure layout")
+
+    def _open_configure_layout(self):
+        """Open the custom Configure Layout dialog."""
+        dlg = ConfigureLayoutDialog(self.figure, self.canvas, parent=self.window())
+        dlg.exec_()
 
     # ── Full-screen pop-out ────────────────────────────────────────────────
 

@@ -348,7 +348,7 @@ class _TitleBar(QWidget):
         layout.addWidget(icon_label)
 
         title = QLabel("Dataset Manager")
-        title.setStyleSheet(f"color: {c['text_inverse']}; font-size: 13px; font-weight: 600; background: transparent; border: none;")
+        title.setStyleSheet(f"color: {c['text_primary']}; font-size: 13px; font-weight: 600; background: transparent; border: none;")
         layout.addWidget(title)
 
         layout.addStretch()

@@ -1156,9 +1156,10 @@ class VisualizationPanel(QWidget):
         series_label = QLabel("Series (Multi-select):")
         self.series_list = QListWidget()
         self.series_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
-        self.series_list.setMaximumHeight(100)  # Limit height to save space
-        data_layout.addWidget(series_label, 5, 0)
+        data_layout.addWidget(series_label, 5, 0, Qt.AlignmentFlag.AlignTop)
         data_layout.addWidget(self.series_list, 5, 1)
+
+        data_layout.setRowStretch(5, 1)
 
         self.controls_tabs.addTab(data_tab, "Data Selection")
 
@@ -1278,11 +1279,8 @@ class VisualizationPanel(QWidget):
 
         self.controls_tabs.addTab(style_tab, "Style")
 
-        # Advanced Tab - use a scroll area for all the options
+        # Advanced Tab
         advanced_tab = QWidget()
-        advanced_scroll = QScrollArea()
-        advanced_scroll.setWidgetResizable(True)
-        advanced_scroll.setWidget(advanced_tab)
         advanced_layout = QGridLayout(advanced_tab)
         row = 0
 
@@ -1446,7 +1444,7 @@ class VisualizationPanel(QWidget):
 
         advanced_layout.addWidget(export_group, row, 0, 1, 2)
 
-        self.controls_tabs.addTab(advanced_scroll, "Advanced")
+        self.controls_tabs.addTab(advanced_tab, "Advanced")
 
         # Set up tab container layout
         controls_container_layout = QVBoxLayout(controls_container)

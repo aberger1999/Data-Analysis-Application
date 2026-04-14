@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (
     QGroupBox, QScrollArea, QDoubleSpinBox, QSizePolicy,
     QToolTip
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QSize
+from PyQt5.QtCore import Qt, pyqtSignal, QSize, QEvent
 from PyQt5.QtGui import QFont, QCursor
 import pandas as pd
 import numpy as np
@@ -187,6 +187,29 @@ def _scroll_wrap(widget):
     return scroll
 
 
+class _ScrollBody(QWidget):
+    """Body widget whose minimum height tracks its preferred (sizeHint) height.
+
+    QScrollArea with widgetResizable=True decides whether to show scrollbars
+    by comparing the viewport size against the widget's *minimumSize*.  When
+    child stylesheets set ``min-height: 0px`` (common for chip/card buttons),
+    the layout's minimum can collapse to near-zero and the scroll area will
+    compress content flat instead of scrolling.
+
+    This subclass listens for LayoutRequest events (fired whenever a child
+    layout is invalidated — e.g. chips are added/removed) and pins its own
+    minimumHeight to sizeHint().height(), giving the scroll area an accurate
+    content measurement at all times.
+    """
+
+    def event(self, e):
+        if e.type() == QEvent.LayoutRequest:
+            target_h = self.sizeHint().height()
+            if self.minimumHeight() != target_h:
+                self.setMinimumHeight(target_h)
+        return super().event(e)
+
+
 # ── Chip selector widget ──────────────────────────────────────────────────
 
 class ChipSelector(QWidget):
@@ -206,8 +229,11 @@ class ChipSelector(QWidget):
 
     def set_items(self, items):
         """Replace all chips with new item list."""
-        # Clear existing
+        # Remove old buttons from the grid layout before scheduling deletion.
+        # deleteLater() alone does NOT detach from the layout, so without
+        # removeWidget() old and new buttons would stack in the same cells.
         for btn in self._chips.values():
+            self._layout.removeWidget(btn)
             btn.deleteLater()
         self._chips.clear()
         self._selected.clear()
@@ -216,8 +242,6 @@ class ChipSelector(QWidget):
             btn = QPushButton(name)
             btn.setCursor(QCursor(Qt.PointingHandCursor))
             btn.setStyleSheet(_chip_style(False))
-            # Make chips expand to fill the available grid cell width.
-            # This keeps the layout readable when there are many columns.
             btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             btn.setMinimumWidth(0)
             btn.clicked.connect(lambda checked, n=name: self._on_chip_clicked(n))
@@ -529,55 +553,55 @@ class FeatureEngineeringPanel(QWidget):
         outer_lay.setContentsMargins(0, 0, 0, 0)
         outer_lay.setSpacing(0)
 
-        body = QWidget()
+        # _ScrollBody pins minimumHeight to sizeHint so the scroll area
+        # shows scrollbars instead of compressing chip grids to zero.
+        body = _ScrollBody()
         body_lay = QVBoxLayout(body)
         body_lay.setContentsMargins(14, 10, 14, 10)
         body_lay.setSpacing(12)
-        body_lay.setAlignment(Qt.AlignTop)
 
         # — Base Column chip selector
         body_lay.addWidget(_section_header("Base Column"))
         self.numeric_chip_selector = ChipSelector(multi_select=False, columns=4)
         body_lay.addWidget(self.numeric_chip_selector)
 
-        # — Second Column chip selector (for binary ops)
-        body_lay.addWidget(_section_header("Second Column (for ratio / arithmetic ops)"))
-        self.second_chip_selector = ChipSelector(multi_select=False, columns=4)
-        self.second_chip_section = body_lay.count() - 1  # track position
-        body_lay.addWidget(self.second_chip_selector)
-        self._second_col_header = body_lay.itemAt(body_lay.count() - 2).widget()
-        # Start hidden
+        # — Second Column chip selector (shown for binary ops like ratio / add)
+        self._second_col_header = _section_header(
+            "Second Column (for ratio / arithmetic ops)"
+        )
         self._second_col_header.setVisible(False)
+        body_lay.addWidget(self._second_col_header)
+
+        self.second_chip_selector = ChipSelector(multi_select=False, columns=4)
         self.second_chip_selector.setVisible(False)
+        body_lay.addWidget(self.second_chip_selector)
 
         # — Operation card grid
         body_lay.addWidget(_section_header("Operation"))
         self.numeric_ops_cards = CardSelector(columns=3)
-        ops = [
+        for key, sym, label in [
             ("square", "x²", "Square"),
-            ("power", "xⁿ", "Power"),
-            ("sqrt", "√x", "Sqrt"),
-            ("log", "ln", "Log"),
-            ("abs", "|x|", "Abs"),
-            ("ratio", "÷", "Ratio"),
-            ("add", "+", "Add"),
+            ("power",  "xⁿ", "Power"),
+            ("sqrt",   "√x", "Sqrt"),
+            ("log",    "ln",  "Log"),
+            ("abs",    "|x|", "Abs"),
+            ("ratio",  "÷",  "Ratio"),
+            ("add",    "+",   "Add"),
             ("subtract", "−", "Subtract"),
             ("multiply", "×", "Multiply"),
-            ("bin", "≡", "Bin"),
+            ("bin",    "≡",   "Bin"),
             ("normalize", "±", "Normalize"),
-            ("zscore", "z", "Z-Score"),
-        ]
-        for key, sym, label in ops:
+            ("zscore", "z",   "Z-Score"),
+        ]:
             self.numeric_ops_cards.add_card(key, sym, label)
         body_lay.addWidget(self.numeric_ops_cards)
 
-        # — Sub-options (shown contextually)
+        # — Contextual sub-options (power exponent / bin count)
         sub_opts = QWidget()
         sub_lay = QHBoxLayout(sub_opts)
         sub_lay.setContentsMargins(0, 0, 0, 0)
         sub_lay.setSpacing(10)
 
-        # Power value
         self._power_widget = QWidget()
         pw_lay = QVBoxLayout(self._power_widget)
         pw_lay.setContentsMargins(0, 0, 0, 0)
@@ -591,7 +615,6 @@ class FeatureEngineeringPanel(QWidget):
         self._power_widget.setVisible(False)
         sub_lay.addWidget(self._power_widget)
 
-        # Bins value
         self._bins_widget = QWidget()
         bn_lay = QVBoxLayout(self._bins_widget)
         bn_lay.setContentsMargins(0, 0, 0, 0)
@@ -620,7 +643,7 @@ class FeatureEngineeringPanel(QWidget):
         scroll = _scroll_wrap(body)
         outer_lay.addWidget(scroll, 1)
 
-        # — Footer button
+        # — Footer button (always visible, outside the scroll area)
         footer = QWidget()
         f_lay = QVBoxLayout(footer)
         f_lay.setContentsMargins(14, 6, 14, 10)
@@ -639,11 +662,10 @@ class FeatureEngineeringPanel(QWidget):
         outer_lay.setContentsMargins(0, 0, 0, 0)
         outer_lay.setSpacing(0)
 
-        body = QWidget()
+        body = _ScrollBody()
         body_lay = QVBoxLayout(body)
         body_lay.setContentsMargins(14, 10, 14, 10)
         body_lay.setSpacing(12)
-        body_lay.setAlignment(Qt.AlignTop)
 
         # — Column selector chips
         body_lay.addWidget(_section_header("Categorical Column"))
@@ -732,11 +754,10 @@ class FeatureEngineeringPanel(QWidget):
         outer_lay.setContentsMargins(0, 0, 0, 0)
         outer_lay.setSpacing(0)
 
-        body = QWidget()
+        body = _ScrollBody()
         body_lay = QVBoxLayout(body)
         body_lay.setContentsMargins(14, 10, 14, 10)
         body_lay.setSpacing(12)
-        body_lay.setAlignment(Qt.AlignTop)
 
         # — Column selector chips
         body_lay.addWidget(_section_header("DateTime Column"))
@@ -796,11 +817,10 @@ class FeatureEngineeringPanel(QWidget):
         outer_lay.setContentsMargins(0, 0, 0, 0)
         outer_lay.setSpacing(0)
 
-        body = QWidget()
+        body = _ScrollBody()
         body_lay = QVBoxLayout(body)
         body_lay.setContentsMargins(14, 10, 14, 10)
         body_lay.setSpacing(12)
-        body_lay.setAlignment(Qt.AlignTop)
 
         # — Column multi-selector chips
         hdr_row = QHBoxLayout()

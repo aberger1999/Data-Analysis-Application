@@ -34,6 +34,25 @@ def _colors():
     return get_colors(current_theme())
 
 
+def _tooltip_qss(c):
+    """Reusable QToolTip stylesheet block for the current theme.
+
+    Qt5's stylesheet cascade can be blocked by intermediate widgets that set
+    their own stylesheets.  Including this block in any widget's stylesheet
+    guarantees its tooltips match the active theme.
+    """
+    return f"""
+        QToolTip {{
+            background-color: {c['bg_tertiary']};
+            color: {c['text_primary']};
+            border: 1px solid {c['border']};
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 9pt;
+        }}
+    """
+
+
 # ── Original Card (left column) ───────────────────────────────────────────
 
 class OriginalCard(QWidget):
@@ -60,7 +79,7 @@ class OriginalCard(QWidget):
             OriginalCard:hover {{
                 border-color: {c['border_medium']};
             }}
-        """)
+        """ + _tooltip_qss(c))
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(12, 10, 6, 10)
@@ -124,7 +143,7 @@ class OriginalCard(QWidget):
                 color: {c['text_inverse']};
                 border-color: {c['accent']};
             }}
-        """)
+        """ + _tooltip_qss(c))
         if missing:
             self.new_copy_btn.setEnabled(False)
             self.new_copy_btn.setToolTip("Cannot copy — original missing")
@@ -184,7 +203,7 @@ class CopyCard(QWidget):
                 border-radius: 6px;
                 {left_border}
             }}
-        """)
+        """ + _tooltip_qss(c))
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(12, 10, 6, 10)
@@ -306,7 +325,25 @@ class CopyCard(QWidget):
         layout.addWidget(self.menu_btn, 0, Qt.AlignVCenter)
 
     def _show_menu(self):
+        c = _colors()
         menu = QMenu(self)
+        menu.setStyleSheet(f"""
+            QMenu {{
+                background-color: {c['bg_secondary']};
+                color: {c['text_primary']};
+                border: 1px solid {c['border']};
+                padding: 4px;
+                border-radius: 6px;
+            }}
+            QMenu::item {{
+                padding: 6px 24px 6px 12px;
+                border-radius: 4px;
+            }}
+            QMenu::item:selected {{
+                background-color: {c['accent']};
+                color: {c['text_inverse']};
+            }}
+        """)
         load_action = menu.addAction("Load")
         rename_action = menu.addAction("Rename")
         delete_action = menu.addAction("Delete Copy")
@@ -341,7 +378,11 @@ class _TitleBar(QWidget):
         self._dialog = parent_dialog
         self._drag_pos = None
         self.setFixedHeight(36)
-        self.setStyleSheet(f"background: {c['bg_base']}; border: none; border-top-left-radius: 10px; border-top-right-radius: 10px;")
+        self.setStyleSheet(
+            f"background: {c['bg_base']}; border: none; "
+            f"border-top-left-radius: 10px; border-top-right-radius: 10px;"
+            + _tooltip_qss(c)
+        )
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(14, 0, 8, 0)
@@ -376,7 +417,7 @@ class _TitleBar(QWidget):
                 background: {c['border']};
                 color: {c['text_primary']};
             }}
-        """)
+        """ + _tooltip_qss(c))
         scan_btn.clicked.connect(self.scan_clicked.emit)
         layout.addWidget(scan_btn)
 
@@ -443,6 +484,34 @@ class DatasetManagerDialog(QDialog):
                 background: {c['bg_primary']};
                 border: 1px solid {c['border']};
                 border-radius: 10px;
+            }}
+            QToolTip {{
+                background-color: {c['bg_tertiary']};
+                color: {c['text_primary']};
+                border: 1px solid {c['border']};
+                padding: 6px 10px;
+                border-radius: 6px;
+                font-size: 9pt;
+            }}
+            QMenu {{
+                background-color: {c['bg_secondary']};
+                color: {c['text_primary']};
+                border: 1px solid {c['border']};
+                padding: 4px;
+                border-radius: 6px;
+            }}
+            QMenu::item {{
+                padding: 6px 24px 6px 12px;
+                border-radius: 4px;
+            }}
+            QMenu::item:selected {{
+                background-color: {c['accent']};
+                color: {c['text_inverse']};
+            }}
+            QMenu::separator {{
+                height: 1px;
+                background-color: {c['border']};
+                margin: 4px 8px;
             }}
         """)
 
@@ -928,7 +997,7 @@ class DatasetManagerDialog(QDialog):
                     {left_border_rule}
                 }}
                 {hover_rule}
-            """)
+            """ + _tooltip_qss(c))
 
     def _active_original_filename(self):
         """Return the original filename whose copy (or itself) is currently active."""
@@ -1012,7 +1081,25 @@ class DatasetManagerDialog(QDialog):
 
     def _on_original_menu(self, original_filename):
         """Show context menu for an original card."""
+        c = _colors()
         menu = QMenu(self)
+        menu.setStyleSheet(f"""
+            QMenu {{
+                background-color: {c['bg_secondary']};
+                color: {c['text_primary']};
+                border: 1px solid {c['border']};
+                padding: 4px;
+                border-radius: 6px;
+            }}
+            QMenu::item {{
+                padding: 6px 24px 6px 12px;
+                border-radius: 4px;
+            }}
+            QMenu::item:selected {{
+                background-color: {c['accent']};
+                color: {c['text_inverse']};
+            }}
+        """)
         load_action = menu.addAction("Load Original Directly")
         delete_action = menu.addAction("Delete Original")
 
